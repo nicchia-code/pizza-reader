@@ -1,5 +1,6 @@
 # Miscellaneous
 .codex
+.worktrees/
 *.class
 *.log
 *.pyc
