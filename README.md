@@ -9,14 +9,15 @@ letter and adjustable WPM.
 ## Current Scope
 
 - Flutter web + Android scaffold.
-- Client-side import for `txt`, `md`, `html`, `epub`, and `.pb`.
+- Client-side import for `txt`, `md`, `html`, `fb2`, `epub`, and `.pb`.
 - `.pb` v1 as canonical UTF-8 JSON with deterministic SHA-256 content hash.
 - Reader modes: `auto`, `hold`, `manual`.
 - Weighted pacing: punctuation and long words get more time while preserving
   the target average WPM.
 - Normal text overlay for jumping back to a line/word.
 - Email magic-code auth adapter for Supabase.
-- Private Supabase Storage upload for `.pb` plus library/progress tables.
+- Private Supabase Storage upload/download/delete for `.pb` plus
+  library/progress tables.
 - Fake auth/library repositories for local development without credentials.
 
 ## Run
@@ -66,4 +67,3 @@ More details are in `docs/supabase.md`.
 MOBI/AZW import is intentionally unsupported in the current client-only MVP.
 The importer returns a clear `UnsupportedError` instead of silently producing a
 bad `.pb`.
-
