@@ -75,6 +75,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   var _authBusy = false;
   var _codeSent = false;
   var _status = 'Importa un ebook o prova il demo locale';
+  String? _importError;
   var _libraryBooks = <LibraryBook>[];
 
   @override
@@ -141,6 +142,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     }
     setState(() {
       _importBusy = true;
+      _importError = null;
       _status = 'Scelta file in corso';
     });
 
@@ -169,6 +171,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
         setState(() {
           _status = 'Import annullato';
           _importBusy = false;
+          _importError = null;
         });
         return;
       }
@@ -188,15 +191,18 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
       setState(() {
         _status = 'Convertito e caricato ${file.name} come .pb';
         _importBusy = false;
+        _importError = null;
       });
     } on UnsupportedError catch (error) {
       setState(() {
-        _status = error.message ?? 'Formato non supportato';
+        _importError = error.message ?? 'Formato non supportato';
+        _status = _importError!;
         _importBusy = false;
       });
     } on Object catch (error) {
       setState(() {
-        _status = 'Import fallito: $error';
+        _importError = 'Import fallito: $error';
+        _status = _importError!;
         _importBusy = false;
       });
     }
@@ -206,7 +212,10 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     if (_authBusy) {
       return;
     }
-    setState(() => _authBusy = true);
+    setState(() {
+      _authBusy = true;
+      _status = 'Invio codice';
+    });
     try {
       await widget.authRepository.sendMagicCode(_emailController.text);
       setState(() {
@@ -226,7 +235,10 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     if (_authBusy) {
       return;
     }
-    setState(() => _authBusy = true);
+    setState(() {
+      _authBusy = true;
+      _status = 'Verifica codice';
+    });
     try {
       await widget.authRepository.verifyEmailOtp(
         _emailController.text,
@@ -248,9 +260,26 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   }
 
   Future<void> _signOut() async {
-    await widget.authRepository.signOut();
-    await _loadLibrary();
-    setState(() => _status = 'Logout completato');
+    if (_authBusy) {
+      return;
+    }
+    setState(() {
+      _authBusy = true;
+      _status = 'Logout in corso';
+    });
+    try {
+      await widget.authRepository.signOut();
+      await _loadLibrary();
+      setState(() {
+        _codeSent = false;
+        _otpController.clear();
+        _status = 'Logout completato';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _authBusy = false);
+      }
+    }
   }
 
   void _setMode(reader.ReaderMode mode) {
@@ -425,7 +454,12 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   Widget _buildNarrowLayout(BuildContext context) {
     return Column(
       children: [
-        _MobileHeader(book: _book, onImport: _importBook),
+        _MobileHeader(
+          book: _book,
+          importBusy: _importBusy,
+          importError: _importError,
+          onImport: _importBook,
+        ),
         const Divider(height: 1),
         Expanded(child: _ReaderStage(state: this, compact: true)),
         const Divider(height: 1),
@@ -532,6 +566,8 @@ class _ReaderTopBar extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$progress - $status',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
@@ -740,6 +776,7 @@ class _ControlRail extends StatelessWidget {
           const SizedBox(height: 20),
           _ImportPanel(
             busy: state._importBusy,
+            error: state._importError,
             cloudEnabled: state.widget.cloudEnabled,
             onPressed: state._importBook,
           ),
@@ -769,74 +806,230 @@ class _AuthPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = state.widget.authRepository.currentUser;
     return _PanelShell(
-      title: user == null ? 'Accesso' : 'Account',
-      trailing: Icon(
-        state.widget.cloudEnabled
-            ? Icons.cloud_done_rounded
-            : Icons.laptop_mac_rounded,
-        color: state.widget.cloudEnabled
-            ? PizzaColors.basil
-            : PizzaColors.blueCheese,
+      title: 'Accesso',
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      titleGap: 10,
+      trailing: _EnvironmentBadge(cloudEnabled: state.widget.cloudEnabled),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: user == null
+            ? _SignedOutAuthContent(
+                key: const ValueKey('signed-out'),
+                state: state,
+              )
+            : _SignedInAuthContent(
+                key: const ValueKey('signed-in'),
+                email: user.email ?? user.id,
+                busy: state._authBusy,
+                onSignOut: state._signOut,
+              ),
       ),
-      child: user == null
-          ? Column(
-              children: [
-                TextField(
-                  controller: state._emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.mail_rounded),
+    );
+  }
+}
+
+class _SignedOutAuthContent extends StatelessWidget {
+  const _SignedOutAuthContent({super.key, required this.state});
+
+  final _PizzaReaderHomeState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final helper = state._codeSent
+        ? 'Codice inviato. Inseriscilo qui.'
+        : 'Magic code via email, nessuna password.';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Non connesso',
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: PizzaColors.muted),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: state._emailController,
+          enabled: !state._authBusy,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: 'Email',
+            prefixIcon: Icon(Icons.mail_rounded, size: 18),
+            prefixIconConstraints: BoxConstraints(minWidth: 38),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: state._otpController,
+                enabled: state._codeSent && !state._authBusy,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  labelText: 'Code',
+                  prefixIcon: Icon(Icons.pin_rounded, size: 18),
+                  prefixIconConstraints: BoxConstraints(minWidth: 38),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
                   ),
                 ),
-                if (state._codeSent) ...[
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: state._otpController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Magic code',
-                      prefixIcon: Icon(Icons.pin_rounded),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: state._authBusy
-                        ? null
-                        : state._codeSent
-                        ? state._verifyOtp
-                        : state._sendMagicCode,
-                    icon: Icon(
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: state._authBusy
+                  ? null
+                  : state._codeSent
+                  ? state._verifyOtp
+                  : state._sendMagicCode,
+              icon: state._authBusy
+                  ? const _SmallBusyIndicator()
+                  : Icon(
                       state._codeSent
                           ? Icons.verified_rounded
                           : Icons.send_rounded,
+                      size: 18,
                     ),
-                    label: Text(state._codeSent ? 'Verifica' : 'Invia codice'),
+              label: Text(state._codeSent ? 'Verifica' : 'Invia'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        Text(
+          helper,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+        ),
+      ],
+    );
+  }
+}
+
+class _SignedInAuthContent extends StatelessWidget {
+  const _SignedInAuthContent({
+    super.key,
+    required this.email,
+    required this.busy,
+    required this.onSignOut,
+  });
+
+  final String email;
+  final bool busy;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.verified_user_rounded, color: PizzaColors.basil),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Connesso',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: PizzaColors.basilDeep,
+                    ),
                   ),
-                ),
-              ],
-            )
-          : Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    user.email ?? user.id,
+                  Text(
+                    email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
                   ),
-                ),
-                Tooltip(
-                  message: 'Logout',
-                  child: IconButton(
-                    onPressed: state._signOut,
-                    icon: const Icon(Icons.logout_rounded),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: busy ? null : onSignOut,
+          icon: busy
+              ? const _SmallBusyIndicator()
+              : const Icon(Icons.logout_rounded, size: 18),
+          label: const Text('Esci dall\'account'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmallBusyIndicator extends StatelessWidget {
+  const _SmallBusyIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 16,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        valueColor: AlwaysStoppedAnimation(
+          Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+        ),
+      ),
+    );
+  }
+}
+
+class _EnvironmentBadge extends StatelessWidget {
+  const _EnvironmentBadge({required this.cloudEnabled});
+
+  final bool cloudEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = cloudEnabled ? PizzaColors.basil : PizzaColors.blueCheese;
+    final icon = cloudEnabled
+        ? Icons.cloud_done_rounded
+        : Icons.laptop_mac_rounded;
+    final label = cloudEnabled ? 'Supabase' : 'Local/Fake';
+    return Tooltip(
+      message: cloudEnabled
+          ? 'Archivio collegato a Supabase'
+          : 'Archivio locale fake per sviluppo',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          border: Border.all(color: color.withValues(alpha: 0.36)),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: color, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -844,24 +1037,42 @@ class _AuthPanel extends StatelessWidget {
 class _ImportPanel extends StatelessWidget {
   const _ImportPanel({
     required this.busy,
+    required this.error,
     required this.cloudEnabled,
     required this.onPressed,
   });
 
   final bool busy;
+  final String? error;
   final bool cloudEnabled;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    final borderColor = error != null
+        ? PizzaColors.tomatoDeep
+        : busy
+        ? PizzaColors.crust
+        : PizzaColors.line;
+    final helper =
+        error ??
+        (busy
+            ? 'Conversione e salvataggio in corso.'
+            : cloudEnabled
+            ? 'Converte in .pb e salva su Supabase.'
+            : 'Converte in .pb sul repository locale fake.');
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
       decoration: BoxDecoration(
-        color: PizzaColors.paper,
-        border: Border.all(color: PizzaColors.line),
+        color: error == null
+            ? PizzaColors.paper
+            : PizzaColors.tomato.withValues(alpha: 0.05),
+        border: Border.all(color: borderColor, width: busy ? 1.4 : 1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -879,27 +1090,56 @@ class _ImportPanel extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 140),
+                  child: busy
+                      ? const _SmallBusyIndicator(key: ValueKey('busy-import'))
+                      : Icon(
+                          error == null
+                              ? Icons.check_circle_outline_rounded
+                              : Icons.error_outline_rounded,
+                          key: ValueKey(
+                            error == null ? 'idle-import' : 'error-import',
+                          ),
+                          color: error == null
+                              ? PizzaColors.basil
+                              : PizzaColors.tomatoDeep,
+                          size: 22,
+                        ),
+                ),
               ],
             ),
-            const SizedBox(height: 14),
-            Text(
-              cloudEnabled
-                  ? 'Conversione nel browser, poi upload privato su Supabase.'
-                  : 'Conversione nel browser con repository locale fake per sviluppo.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+            const SizedBox(height: 12),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 160),
+              child: Text(
+                helper,
+                key: ValueKey(helper),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: error == null
+                      ? PizzaColors.muted
+                      : PizzaColors.tomatoDeep,
+                  fontWeight: error == null ? FontWeight.w400 : FontWeight.w700,
+                ),
+              ),
             ),
-            const SizedBox(height: 14),
+            if (busy) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: const LinearProgressIndicator(minHeight: 5),
+              ),
+            ],
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: busy ? null : onPressed,
-                icon: Icon(
-                  busy
-                      ? Icons.hourglass_top_rounded
-                      : Icons.upload_file_rounded,
-                ),
+                icon: busy
+                    ? const _SmallBusyIndicator()
+                    : const Icon(Icons.upload_file_rounded),
                 label: Text(busy ? 'Import...' : 'Scegli file'),
               ),
             ),
@@ -1007,11 +1247,19 @@ class _ChapterPanel extends StatelessWidget {
 }
 
 class _PanelShell extends StatelessWidget {
-  const _PanelShell({required this.title, required this.child, this.trailing});
+  const _PanelShell({
+    required this.title,
+    required this.child,
+    this.trailing,
+    this.padding = const EdgeInsets.all(16),
+    this.titleGap = 12,
+  });
 
   final String title;
   final Widget child;
   final Widget? trailing;
+  final EdgeInsetsGeometry padding;
+  final double titleGap;
 
   @override
   Widget build(BuildContext context) {
@@ -1022,7 +1270,7 @@ class _PanelShell extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: padding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1037,7 +1285,7 @@ class _PanelShell extends StatelessWidget {
                 ?trailing,
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: titleGap),
             child,
           ],
         ),
@@ -1063,6 +1311,14 @@ class _LibraryRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    LibraryBook? activeStoredBook;
+    for (final stored in libraryBooks) {
+      if (stored.id == book.id) {
+        activeStoredBook = stored;
+        break;
+      }
+    }
+
     return ColoredBox(
       color: PizzaColors.paper.withValues(alpha: 0.82),
       child: ListView(
@@ -1082,25 +1338,42 @@ class _LibraryRail extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 28),
-          Text('Libreria', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 24),
+          Text('In lettura', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
-          _BookTile(
-            title: book.title,
-            subtitle: '${book.chapters.length} capitoli - attivo',
-            active: true,
-          ),
-          for (final stored in libraryBooks)
-            if (stored.id != book.id)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: _BookTile(
-                  title: stored.title,
-                  subtitle: '${stored.byteLength} byte .pb',
-                  active: false,
+          _ActiveBookCard(book: book, storedBook: activeStoredBook),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Libri importati',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-          const SizedBox(height: 28),
+              _CountBadge(count: libraryBooks.length),
+            ],
+          ),
+          const SizedBox(height: 10),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: libraryBooks.isEmpty
+                ? const _LibraryEmptyState(key: ValueKey('empty-library'))
+                : Column(
+                    key: ValueKey('library-${libraryBooks.length}-${book.id}'),
+                    children: [
+                      for (var i = 0; i < libraryBooks.length; i++)
+                        Padding(
+                          padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+                          child: _LibraryBookCard(
+                            book: libraryBooks[i],
+                            active: libraryBooks[i].id == book.id,
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 24),
           Text('Indice', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
           for (var i = 0; i < book.chapters.length; i++)
@@ -1119,20 +1392,93 @@ class _LibraryRail extends StatelessWidget {
   }
 }
 
-class _BookTile extends StatelessWidget {
-  const _BookTile({
-    required this.title,
-    required this.subtitle,
-    required this.active,
-  });
+class _ActiveBookCard extends StatelessWidget {
+  const _ActiveBookCard({required this.book, required this.storedBook});
 
-  final String title;
-  final String subtitle;
+  final PizzaBook book;
+  final LibraryBook? storedBook;
+
+  @override
+  Widget build(BuildContext context) {
+    final stored = storedBook;
+    final detail = stored == null
+        ? '${book.chapters.length} capitoli - ${_pizzaBookFormat(book)}'
+        : '${_formatByteLength(stored.byteLength)} - ${_libraryBookFormat(stored)}';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PizzaColors.dough,
+        border: Border.all(color: PizzaColors.crust, width: 1.4),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.local_pizza_rounded,
+                  color: PizzaColors.tomato,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    book.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                const _MetaPill(
+                  icon: Icons.play_arrow_rounded,
+                  label: 'Attivo',
+                  color: PizzaColors.tomato,
+                ),
+                _MetaPill(
+                  icon: Icons.insert_drive_file_rounded,
+                  label: detail,
+                  color: PizzaColors.blueCheese,
+                ),
+              ],
+            ),
+            if (book.author != null && book.author!.trim().isNotEmpty) ...[
+              const SizedBox(height: 7),
+              Text(
+                book.author!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryBookCard extends StatelessWidget {
+  const _LibraryBookCard({required this.book, required this.active});
+
+  final LibraryBook book;
   final bool active;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
       decoration: BoxDecoration(
         color: active ? PizzaColors.dough : PizzaColors.paper,
         border: Border.all(
@@ -1146,13 +1492,181 @@ class _BookTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+            Row(
+              children: [
+                Icon(
+                  active ? Icons.local_pizza_rounded : Icons.menu_book_rounded,
+                  color: active ? PizzaColors.tomato : PizzaColors.basil,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    book.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            if (book.author != null && book.author!.trim().isNotEmpty) ...[
+              const SizedBox(height: 5),
+              Text(
+                book.author!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+              ),
+            ],
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _MetaPill(
+                  icon: active
+                      ? Icons.play_arrow_rounded
+                      : Icons.check_circle_outline_rounded,
+                  label: active ? 'Attivo' : 'Importato',
+                  color: active ? PizzaColors.tomato : PizzaColors.basil,
+                ),
+                _MetaPill(
+                  icon: Icons.data_object_rounded,
+                  label: _formatByteLength(book.byteLength),
+                  color: PizzaColors.blueCheese,
+                ),
+                _MetaPill(
+                  icon: Icons.description_rounded,
+                  label: _libraryBookFormat(book),
+                  color: PizzaColors.crustDeep,
+                ),
+              ],
+            ),
+            if (book.sourceFileName != null &&
+                book.sourceFileName!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                book.sourceFileName!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryEmptyState extends StatelessWidget {
+  const _LibraryEmptyState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PizzaColors.paperAlt.withValues(alpha: 0.62),
+        border: Border.all(color: PizzaColors.line),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.library_books_rounded, color: PizzaColors.basil),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nessun libro importato',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Il demo locale resta attivo.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PizzaColors.paperAlt,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: PizzaColors.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        child: Text(
+          '$count',
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: PizzaColors.muted),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: color, fontSize: 12),
+              ),
             ),
           ],
         ),
@@ -1355,13 +1869,25 @@ class _TextJumpLine extends StatelessWidget {
 }
 
 class _MobileHeader extends StatelessWidget {
-  const _MobileHeader({required this.book, required this.onImport});
+  const _MobileHeader({
+    required this.book,
+    required this.importBusy,
+    required this.importError,
+    required this.onImport,
+  });
 
   final PizzaBook book;
+  final bool importBusy;
+  final String? importError;
   final VoidCallback onImport;
 
   @override
   Widget build(BuildContext context) {
+    final status = importBusy
+        ? 'Import in corso'
+        : importError == null
+        ? null
+        : 'Import fallito';
     return ColoredBox(
       color: PizzaColors.paper.withValues(alpha: 0.92),
       child: Padding(
@@ -1371,16 +1897,37 @@ class _MobileHeader extends StatelessWidget {
             Image.asset('assets/brand/pizzalogo.png', width: 40, height: 40),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                book.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (status != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: importBusy
+                            ? PizzaColors.muted
+                            : PizzaColors.tomatoDeep,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             IconButton(
-              onPressed: onImport,
-              icon: const Icon(Icons.upload_file_rounded),
+              onPressed: importBusy ? null : onImport,
+              icon: importBusy
+                  ? const _SmallBusyIndicator()
+                  : const Icon(Icons.upload_file_rounded),
               tooltip: 'Importa ebook',
             ),
           ],
@@ -1399,14 +1946,106 @@ class _MobileControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: PizzaColors.paper,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _CompactModeSelector(state: state)),
+                  const SizedBox(width: 10),
+                  _WpmReadout(value: state._wpm.round()),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SliderTheme(
+                data: Theme.of(context).sliderTheme.copyWith(trackHeight: 5),
+                child: Slider(
+                  value: state._wpm,
+                  min: 120,
+                  max: 900,
+                  divisions: 39,
+                  label: '${state._wpm.round()} WPM',
+                  onChanged: state._setWpm,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactModeSelector extends StatelessWidget {
+  const _CompactModeSelector({required this.state});
+
+  final _PizzaReaderHomeState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<reader.ReaderMode>(
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(
+          value: reader.ReaderMode.hold,
+          icon: Icon(Icons.touch_app_rounded),
+          tooltip: 'Hold',
+        ),
+        ButtonSegment(
+          value: reader.ReaderMode.auto,
+          icon: Icon(Icons.play_arrow_rounded),
+          tooltip: 'Auto',
+        ),
+        ButtonSegment(
+          value: reader.ReaderMode.manual,
+          icon: Icon(Icons.ads_click_rounded),
+          tooltip: 'Manual',
+        ),
+      ],
+      selected: {state._mode},
+      onSelectionChanged: (value) => state._setMode(value.first),
+    );
+  }
+}
+
+class _WpmReadout extends StatelessWidget {
+  const _WpmReadout({required this.value});
+
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PizzaColors.dough,
+        border: Border.all(color: PizzaColors.line),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SizedBox(
+        width: 82,
+        height: 42,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _ModePanel(state: state),
-            const SizedBox(height: 10),
-            _SpeedPanel(state: state),
+            Text(
+              '$value',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: PizzaColors.tomatoDeep,
+                height: 1,
+              ),
+            ),
+            Text(
+              'WPM',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: PizzaColors.muted,
+                fontSize: 11,
+                height: 1,
+              ),
+            ),
           ],
         ),
       ),
@@ -1485,6 +2124,53 @@ class _WordContourPainter extends CustomPainter {
   bool shouldRepaint(covariant _WordContourPainter oldDelegate) {
     return oldDelegate.progress != progress;
   }
+}
+
+String _formatByteLength(int bytes) {
+  if (bytes < 1024) {
+    return '$bytes B';
+  }
+  final kib = bytes / 1024;
+  if (kib < 1024) {
+    return '${_compactDecimal(kib)} KB';
+  }
+  return '${_compactDecimal(kib / 1024)} MB';
+}
+
+String _compactDecimal(double value) {
+  final fixed = value >= 10
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(1);
+  return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
+}
+
+String _libraryBookFormat(LibraryBook book) {
+  final source = _fileExtension(book.sourceFileName);
+  final stored = _fileExtension(book.storagePath) ?? 'PB';
+  if (source == null || source == stored) {
+    return stored;
+  }
+  return '$source/$stored';
+}
+
+String _pizzaBookFormat(PizzaBook book) {
+  final sourceFile = book.metadata['source_file'];
+  if (sourceFile is String) {
+    return _fileExtension(sourceFile) ?? 'PB';
+  }
+  return 'PB';
+}
+
+String? _fileExtension(String? path) {
+  if (path == null) {
+    return null;
+  }
+  final name = path.trim().split('/').last;
+  final dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot == name.length - 1) {
+    return null;
+  }
+  return name.substring(dot + 1).toUpperCase();
 }
 
 class _TextLine {
