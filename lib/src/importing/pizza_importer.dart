@@ -9,7 +9,7 @@ import 'package:xml/xml.dart' as xml;
 import '../core/pizza_book.dart';
 import '../core/pizza_book_codec.dart';
 
-enum PizzaImportKind { text, markdown, html, epub, pizzaBook, mobi, azw }
+enum PizzaImportKind { text, markdown, html, epub, fb2, pizzaBook, mobi, azw }
 
 class PizzaImporter {
   const PizzaImporter({this.codec = const PizzaBookCodec()});
@@ -42,6 +42,8 @@ class PizzaImporter {
         return _importHtml(bytes, fileName: fileName, title: title);
       case PizzaImportKind.epub:
         return _importEpub(bytes, fileName: fileName, title: title);
+      case PizzaImportKind.fb2:
+        return _importFb2(bytes, fileName: fileName, title: title);
       case PizzaImportKind.pizzaBook:
         return codec.decodeBytes(bytes);
       case PizzaImportKind.mobi:
@@ -100,12 +102,8 @@ class PizzaImporter {
 
     final opf = xml.XmlDocument.parse(opfSource);
     final basePath = _directoryName(opfPath);
-    final bookTitle =
-        title ??
-        _firstElement(
-          opf,
-          (element) => element.name.local == 'title',
-        )?.innerText.trim();
+    final metadata = _epubMetadata(opf);
+    final bookTitle = title ?? metadata.title;
     final manifest = _epubManifest(opf);
     final spineIds = _epubSpineIds(opf);
     final orderedItems = spineIds
@@ -149,6 +147,47 @@ class PizzaImporter {
       fileName: fileName,
       title: _cleanTitle(bookTitle, fileName),
       sourceKind: 'epub',
+      author: metadata.author,
+      language: metadata.language,
+    );
+  }
+
+  PizzaBook _importFb2(
+    List<int> bytes, {
+    required String fileName,
+    String? title,
+  }) {
+    final source = utf8.decode(bytes, allowMalformed: false);
+    final document = xml.XmlDocument.parse(source);
+    final metadata = _fb2Metadata(document);
+    final chapters = <PizzaChapter>[];
+
+    for (final section in _fb2ReadableSections(document)) {
+      final text = _fb2SectionText(section);
+      if (text.isEmpty) {
+        continue;
+      }
+
+      chapters.add(
+        PizzaChapter(
+          id: 'chapter-${chapters.length + 1}',
+          title: _fb2SectionTitle(section) ?? 'Chapter ${chapters.length + 1}',
+          text: text,
+        ),
+      );
+    }
+
+    if (chapters.isEmpty) {
+      throw const FormatException('FB2 does not contain readable sections.');
+    }
+
+    return _bookFromChapters(
+      chapters,
+      fileName: fileName,
+      title: _cleanTitle(title ?? metadata.title, fileName),
+      sourceKind: 'fb2',
+      author: metadata.author,
+      language: metadata.language,
     );
   }
 
@@ -179,6 +218,8 @@ class PizzaImporter {
     required String fileName,
     required String title,
     required String sourceKind,
+    String? author,
+    String? language,
   }) {
     final textFingerprint = chapters
         .map((chapter) => chapter.text)
@@ -187,6 +228,8 @@ class PizzaImporter {
     final book = PizzaBook(
       id: id,
       title: title,
+      author: author,
+      language: language,
       chapters: chapters,
       metadata: <String, Object?>{
         'source_file': _baseName(fileName),
@@ -219,6 +262,14 @@ class _EpubManifestItem {
   }
 }
 
+class _BookMetadata {
+  const _BookMetadata({this.title, this.author, this.language});
+
+  final String? title;
+  final String? author;
+  final String? language;
+}
+
 PizzaImportKind _kindFromFileName(String fileName) {
   final lower = fileName.toLowerCase();
   if (lower.endsWith('.pb')) {
@@ -236,6 +287,9 @@ PizzaImportKind _kindFromFileName(String fileName) {
   if (lower.endsWith('.epub')) {
     return PizzaImportKind.epub;
   }
+  if (lower.endsWith('.fb2')) {
+    return PizzaImportKind.fb2;
+  }
   if (lower.endsWith('.mobi')) {
     return PizzaImportKind.mobi;
   }
@@ -243,6 +297,19 @@ PizzaImportKind _kindFromFileName(String fileName) {
     return PizzaImportKind.azw;
   }
   throw FormatException('Unsupported import file type for "$fileName".');
+}
+
+_BookMetadata _epubMetadata(xml.XmlDocument opf) {
+  final metadata = _firstElement(
+    opf,
+    (element) => element.name.local == 'metadata',
+  );
+
+  return _BookMetadata(
+    title: _firstElementText(metadata, 'title'),
+    author: _firstElementText(metadata, 'creator'),
+    language: _firstElementText(metadata, 'language'),
+  );
 }
 
 Map<String, _EpubManifestItem> _epubManifest(xml.XmlDocument opf) {
@@ -280,16 +347,155 @@ List<String> _epubSpineIds(xml.XmlDocument opf) {
   return ids;
 }
 
+xml.XmlElement? _fb2TitleInfo(xml.XmlDocument document) {
+  final description = _firstElement(
+    document,
+    (element) => element.name.local == 'description',
+  );
+  return _firstElement(
+    description,
+    (element) => element.name.local == 'title-info',
+  );
+}
+
+_BookMetadata _fb2Metadata(xml.XmlDocument document) {
+  final titleInfo = _fb2TitleInfo(document);
+  return _BookMetadata(
+    title: _firstElementText(titleInfo, 'book-title'),
+    author: _fb2Authors(titleInfo),
+    language: _firstElementText(titleInfo, 'lang'),
+  );
+}
+
+String? _fb2Authors(xml.XmlElement? titleInfo) {
+  if (titleInfo == null) {
+    return null;
+  }
+
+  final authors = titleInfo.children
+      .whereType<xml.XmlElement>()
+      .where((element) => element.name.local == 'author')
+      .map(_fb2AuthorName)
+      .whereType<String>()
+      .toList();
+  if (authors.isEmpty) {
+    return null;
+  }
+  return authors.join(', ');
+}
+
+String? _fb2AuthorName(xml.XmlElement author) {
+  final nameParts = <String>[
+    ?_firstElementText(author, 'first-name'),
+    ?_firstElementText(author, 'middle-name'),
+    ?_firstElementText(author, 'last-name'),
+  ];
+  if (nameParts.isNotEmpty) {
+    return nameParts.join(' ');
+  }
+
+  final nickname = _firstElementText(author, 'nickname');
+  if (nickname != null) {
+    return nickname;
+  }
+
+  return _cleanMetadataText(author.innerText);
+}
+
+Iterable<xml.XmlElement> _fb2ReadableSections(xml.XmlDocument document) sync* {
+  final bodies = document.descendants.whereType<xml.XmlElement>().where((
+    element,
+  ) {
+    if (element.name.local != 'body') {
+      return false;
+    }
+    final name = element.getAttribute('name')?.toLowerCase();
+    return name != 'notes' && name != 'comments';
+  });
+
+  for (final body in bodies) {
+    yield* body.descendants.whereType<xml.XmlElement>().where(
+      (element) => element.name.local == 'section',
+    );
+  }
+}
+
+String? _fb2SectionTitle(xml.XmlElement section) {
+  for (final child in section.children.whereType<xml.XmlElement>()) {
+    if (child.name.local != 'title') {
+      continue;
+    }
+
+    final blocks = <String>[];
+    for (final titleChild in child.children.whereType<xml.XmlElement>()) {
+      blocks.addAll(_fb2TextBlocks(titleChild));
+    }
+    final title =
+        _cleanMetadataText(blocks.join(' ')) ??
+        _cleanMetadataText(child.innerText);
+    if (title != null && title.isNotEmpty) {
+      return title;
+    }
+  }
+  return null;
+}
+
+String _fb2SectionText(xml.XmlElement section) {
+  final blocks = <String>[];
+  for (final child in section.children.whereType<xml.XmlElement>()) {
+    final localName = child.name.local;
+    if (localName == 'title' || localName == 'section') {
+      continue;
+    }
+    blocks.addAll(_fb2TextBlocks(child));
+  }
+  return _normalizeImportedText(blocks.join('\n\n'));
+}
+
+List<String> _fb2TextBlocks(xml.XmlElement element) {
+  final localName = element.name.local;
+  if (_fb2IgnoredTextTags.contains(localName)) {
+    return const <String>[];
+  }
+
+  if (_fb2TextBlockTags.contains(localName)) {
+    final text = _cleanMetadataText(element.innerText);
+    return text == null ? const <String>[] : <String>[text];
+  }
+
+  final blocks = <String>[];
+  for (final child in element.children.whereType<xml.XmlElement>()) {
+    blocks.addAll(_fb2TextBlocks(child));
+  }
+  if (blocks.isNotEmpty) {
+    return blocks;
+  }
+
+  final text = _cleanMetadataText(element.innerText);
+  return text == null ? const <String>[] : <String>[text];
+}
+
 xml.XmlElement? _firstElement(
-  xml.XmlDocument document,
+  xml.XmlNode? node,
   bool Function(xml.XmlElement element) test,
 ) {
-  for (final element in document.descendants.whereType<xml.XmlElement>()) {
+  if (node == null) {
+    return null;
+  }
+  for (final element in node.descendants.whereType<xml.XmlElement>()) {
     if (test(element)) {
       return element;
     }
   }
   return null;
+}
+
+String? _firstElementText(xml.XmlNode? node, String localName) {
+  final element = _firstElement(
+    node,
+    (element) => element.name.local == localName,
+  );
+  return _cleanMetadataText(element?.innerText);
 }
 
 String? _readArchiveText(Archive archive, String path) {
@@ -399,7 +605,7 @@ String _normalizeImportedText(String text) {
 }
 
 String _cleanTitle(String? title, String fileName) {
-  final cleaned = title?.trim();
+  final cleaned = _cleanMetadataText(title);
   if (cleaned != null && cleaned.isNotEmpty) {
     return cleaned;
   }
@@ -420,6 +626,14 @@ String _baseNameWithoutExtension(String fileName) {
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   return title.isEmpty ? 'Untitled' : title;
+}
+
+String? _cleanMetadataText(String? value) {
+  if (value == null) {
+    return null;
+  }
+  final cleaned = _normalizeImportedText(value);
+  return cleaned.isEmpty ? null : cleaned;
 }
 
 String _baseName(String fileName) {
@@ -459,6 +673,24 @@ String _normalizeArchivePath(String path) {
 }
 
 const Set<String> _skippedHtmlTags = <String>{'script', 'style', 'noscript'};
+
+const Set<String> _fb2IgnoredTextTags = <String>{
+  'binary',
+  'description',
+  'image',
+  'section',
+  'title',
+};
+
+const Set<String> _fb2TextBlockTags = <String>{
+  'date',
+  'p',
+  'subtitle',
+  'td',
+  'text-author',
+  'th',
+  'v',
+};
 
 const Set<String> _blockHtmlTags = <String>{
   'address',
