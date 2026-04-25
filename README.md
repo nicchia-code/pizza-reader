@@ -1,17 +1,69 @@
-# pizza_reader
+# Pizza Reader
 
-A new Flutter project.
+Client-side Flutter app for fast reading ebooks.
 
-## Getting Started
+Pizza Reader converts supported source files in the browser into a universal
+Pizza Book `.pb` file, then reads one word at a time with a central pivot
+letter and adjustable WPM.
 
-This project is a starting point for a Flutter application.
+## Current Scope
 
-A few resources to get you started if this is your first Flutter project:
+- Flutter web + Android scaffold.
+- Client-side import for `txt`, `md`, `html`, `epub`, and `.pb`.
+- `.pb` v1 as canonical UTF-8 JSON with deterministic SHA-256 content hash.
+- Reader modes: `auto`, `hold`, `manual`.
+- Weighted pacing: punctuation and long words get more time while preserving
+  the target average WPM.
+- Normal text overlay for jumping back to a line/word.
+- Email magic-code auth adapter for Supabase.
+- Private Supabase Storage upload for `.pb` plus library/progress tables.
+- Fake auth/library repositories for local development without credentials.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Run
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Without Supabase credentials the app runs with fake local repositories:
+
+```sh
+HOME=/tmp XDG_CONFIG_HOME=/tmp DART_SUPPRESS_ANALYTICS=true \
+FLUTTER_SUPPRESS_ANALYTICS=true flutter run -d web-server --web-port 8080
+```
+
+With Supabase:
+
+```sh
+HOME=/tmp XDG_CONFIG_HOME=/tmp DART_SUPPRESS_ANALYTICS=true \
+FLUTTER_SUPPRESS_ANALYTICS=true flutter run -d web-server --web-port 8080 \
+  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
+```
+
+For a static build:
+
+```sh
+HOME=/tmp XDG_CONFIG_HOME=/tmp DART_SUPPRESS_ANALYTICS=true \
+FLUTTER_SUPPRESS_ANALYTICS=true flutter build web
+```
+
+## Verify
+
+```sh
+HOME=/tmp XDG_CONFIG_HOME=/tmp DART_SUPPRESS_ANALYTICS=true \
+FLUTTER_SUPPRESS_ANALYTICS=true flutter analyze
+
+HOME=/tmp XDG_CONFIG_HOME=/tmp DART_SUPPRESS_ANALYTICS=true \
+FLUTTER_SUPPRESS_ANALYTICS=true flutter test
+```
+
+## Supabase
+
+Apply the SQL migration in `supabase/migrations`, then configure the app with
+`SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+
+More details are in `docs/supabase.md`.
+
+## Notes
+
+MOBI/AZW import is intentionally unsupported in the current client-only MVP.
+The importer returns a clear `UnsupportedError` instead of silently producing a
+bad `.pb`.
+
