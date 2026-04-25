@@ -42,8 +42,10 @@ create table if not exists public.books (
 create table if not exists public.reading_progress (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   book_id text not null,
-  paragraph_index integer not null default 0 check (paragraph_index >= 0),
+  chapter_index integer not null default 0 check (chapter_index >= 0),
   word_index integer not null default 0 check (word_index >= 0),
+  wpm integer check (wpm is null or wpm > 0),
+  mode text check (mode is null or char_length(mode) > 0),
   progress_fraction double precision not null default 0
     check (progress_fraction >= 0 and progress_fraction <= 1),
   updated_at timestamptz not null default now(),

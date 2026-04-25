@@ -49,6 +49,16 @@ class FakeLibraryRepository implements LibraryRepository {
   }
 
   @override
+  Future<Uint8List> downloadBookBytes(LibraryBook book) async {
+    final storagePath = requireText('storagePath', book.storagePath);
+    final bytes = _objects[storagePath];
+    if (bytes == null) {
+      throw const LibraryRepositoryException('Book bytes are not available.');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  @override
   Future<LibraryBook> upsertBookMetadata(LibraryBook book) async {
     final now = DateTime.now().toUtc();
     final normalized = LibraryBook.fromJson({
@@ -89,5 +99,15 @@ class FakeLibraryRepository implements LibraryRepository {
   @override
   Future<ReadingProgress?> getReadingProgress(String bookId) async {
     return _progress[sanitizeBookId(bookId)];
+  }
+
+  @override
+  Future<void> deleteBook(String bookId) async {
+    final id = sanitizeBookId(bookId);
+    final book = _books.remove(id);
+    _progress.remove(id);
+    if (book != null) {
+      _objects.remove(book.storagePath);
+    }
   }
 }

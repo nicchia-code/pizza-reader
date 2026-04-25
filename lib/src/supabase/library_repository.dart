@@ -17,6 +17,8 @@ abstract interface class LibraryRepository {
     String? bookId,
   });
 
+  Future<Uint8List> downloadBookBytes(LibraryBook book);
+
   Future<LibraryBook> upsertBookMetadata(LibraryBook book);
 
   Future<ReadingProgress> upsertReadingProgress(ReadingProgress progress);
@@ -24,6 +26,8 @@ abstract interface class LibraryRepository {
   Future<List<LibraryBook>> listBooks();
 
   Future<ReadingProgress?> getReadingProgress(String bookId);
+
+  Future<void> deleteBook(String bookId);
 }
 
 class SupabaseLibraryRepository implements LibraryRepository {
@@ -72,6 +76,23 @@ class SupabaseLibraryRepository implements LibraryRepository {
         sha256: digest,
       ),
     );
+  }
+
+  @override
+  Future<Uint8List> downloadBookBytes(LibraryBook book) async {
+    final userId = _requireUserId();
+    final storageBucket = requireText('storageBucket', book.storageBucket);
+    final storagePath = requireText('storagePath', book.storagePath);
+    if (!storagePath.startsWith('$userId/')) {
+      throw const LibraryRepositoryException(
+        'storagePath must be scoped under current user.',
+      );
+    }
+    if (!storagePath.endsWith('.pb')) {
+      throw const LibraryRepositoryException('storagePath must end with .pb.');
+    }
+
+    return _client.storage.from(storageBucket).download(storagePath);
   }
 
   @override
@@ -126,6 +147,30 @@ class SupabaseLibraryRepository implements LibraryRepository {
         .maybeSingle();
 
     return response == null ? null : ReadingProgress.fromJson(response);
+  }
+
+  @override
+  Future<void> deleteBook(String bookId) async {
+    _requireUserId();
+    final id = sanitizeBookId(bookId);
+    final response = await _client
+        .from(booksTableName)
+        .select('storage_bucket, storage_path')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (response == null) {
+      return;
+    }
+
+    final storageBucket =
+        response['storage_bucket'] as String? ?? pizzaBooksBucketId;
+    final storagePath = response['storage_path'] as String;
+
+    await _client.from(booksTableName).delete().eq('id', id);
+    await _client.storage
+        .from(requireText('storageBucket', storageBucket))
+        .remove([requireText('storagePath', storagePath)]);
   }
 
   String _requireUserId() {
@@ -245,16 +290,20 @@ class ReadingProgress {
   const ReadingProgress({
     required this.bookId,
     required this.userId,
-    this.paragraphIndex = 0,
+    this.chapterIndex = 0,
     this.wordIndex = 0,
+    this.wpm,
+    this.mode,
     this.progressFraction = 0,
     this.updatedAt,
   });
 
   final String bookId;
   final String userId;
-  final int paragraphIndex;
+  final int chapterIndex;
   final int wordIndex;
+  final int? wpm;
+  final String? mode;
   final double progressFraction;
   final DateTime? updatedAt;
 
@@ -262,9 +311,13 @@ class ReadingProgress {
     return ReadingProgress(
       bookId: json['book_id'] as String,
       userId: json['user_id'] as String,
-      paragraphIndex: (json['paragraph_index'] as num).toInt(),
-      wordIndex: (json['word_index'] as num).toInt(),
-      progressFraction: (json['progress_fraction'] as num).toDouble(),
+      chapterIndex:
+          ((json['chapter_index'] ?? json['paragraph_index'] ?? 0) as num)
+              .toInt(),
+      wordIndex: ((json['word_index'] ?? 0) as num).toInt(),
+      wpm: (json['wpm'] as num?)?.toInt(),
+      mode: json['mode'] as String?,
+      progressFraction: ((json['progress_fraction'] ?? 0) as num).toDouble(),
       updatedAt: dateTimeFromJson(json['updated_at']),
     );
   }
@@ -272,16 +325,20 @@ class ReadingProgress {
   ReadingProgress copyWith({
     String? bookId,
     String? userId,
-    int? paragraphIndex,
+    int? chapterIndex,
     int? wordIndex,
+    int? wpm,
+    String? mode,
     double? progressFraction,
     DateTime? updatedAt,
   }) {
     return ReadingProgress(
       bookId: bookId ?? this.bookId,
       userId: userId ?? this.userId,
-      paragraphIndex: paragraphIndex ?? this.paragraphIndex,
+      chapterIndex: chapterIndex ?? this.chapterIndex,
       wordIndex: wordIndex ?? this.wordIndex,
+      wpm: wpm ?? this.wpm,
+      mode: mode ?? this.mode,
       progressFraction: progressFraction ?? this.progressFraction,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -290,10 +347,13 @@ class ReadingProgress {
   Map<String, dynamic> toUpsertJson() {
     final id = sanitizeBookId(bookId);
     final normalizedUserId = requireText('userId', userId);
-    if (paragraphIndex < 0 || wordIndex < 0) {
+    if (chapterIndex < 0 || wordIndex < 0) {
       throw const LibraryRepositoryException(
         'Progress indices cannot be negative.',
       );
+    }
+    if (wpm != null && wpm! <= 0) {
+      throw const LibraryRepositoryException('wpm must be positive.');
     }
     if (progressFraction < 0 || progressFraction > 1) {
       throw const LibraryRepositoryException(
@@ -304,8 +364,10 @@ class ReadingProgress {
     return {
       'book_id': id,
       'user_id': normalizedUserId,
-      'paragraph_index': paragraphIndex,
+      'chapter_index': chapterIndex,
       'word_index': wordIndex,
+      'wpm': wpm,
+      'mode': nullableTrim(mode),
       'progress_fraction': progressFraction,
     };
   }
