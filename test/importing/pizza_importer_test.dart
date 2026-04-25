@@ -64,11 +64,30 @@ void main() {
       );
 
       expect(book.title, 'Sample EPUB');
+      expect(book.author, 'Pat Pizzaiolo');
+      expect(book.language, 'en');
       expect(book.chapters, hasLength(2));
       expect(book.chapters[0].title, 'Start');
       expect(book.chapters[0].text, contains('First pizza chapter.'));
       expect(book.chapters[1].title, 'End');
       expect(book.chapters[1].text, contains('Second pizza chapter.'));
+    });
+
+    test('imports FB2 metadata and readable sections', () {
+      const importer = PizzaImporter();
+      final book = importer.importBytes(_sampleFb2(), fileName: 'sample.fb2');
+
+      expect(book.title, 'Sample FB2');
+      expect(book.author, 'Ada Byron Lovelace');
+      expect(book.language, 'en');
+      expect(book.chapters, hasLength(2));
+      expect(book.chapters[0].title, 'Dough');
+      expect(book.chapters[0].text, contains('First FB2 paragraph.'));
+      expect(book.chapters[0].text, contains('Second FB2 paragraph.'));
+      expect(book.chapters[0].text, isNot(contains('Part One')));
+      expect(book.chapters[1].title, 'Bake');
+      expect(book.chapters[1].text, contains('Second FB2 chapter.'));
+      expect(book.metadata['source_kind'], 'fb2');
     });
 
     test('returns clear UnsupportedError for MOBI and AZW', () {
@@ -110,6 +129,8 @@ Uint8List _minimalEpub() {
 <package version="3.0" xmlns="http://www.idpf.org/2007/opf">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Sample EPUB</dc:title>
+    <dc:creator>Pat Pizzaiolo</dc:creator>
+    <dc:language>en</dc:language>
   </metadata>
   <manifest>
     <item id="chap-1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
@@ -140,4 +161,37 @@ Uint8List _minimalEpub() {
     );
 
   return ZipEncoder().encodeBytes(archive);
+}
+
+List<int> _sampleFb2() {
+  return utf8.encode('''
+<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+  <description>
+    <title-info>
+      <author>
+        <first-name>Ada</first-name>
+        <middle-name>Byron</middle-name>
+        <last-name>Lovelace</last-name>
+      </author>
+      <book-title>Sample FB2</book-title>
+      <lang>en</lang>
+    </title-info>
+  </description>
+  <body>
+    <section>
+      <title><p>Part One</p></title>
+      <section>
+        <title><p>Dough</p></title>
+        <p>First FB2 paragraph.</p>
+        <p>Second FB2 paragraph.</p>
+      </section>
+      <section>
+        <title><p>Bake</p></title>
+        <p>Second FB2 chapter.</p>
+      </section>
+    </section>
+  </body>
+</FictionBook>
+''');
 }
