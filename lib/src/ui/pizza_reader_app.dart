@@ -170,14 +170,14 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   var _importBusy = false;
   var _authBusy = false;
   var _codeSent = false;
-  var _status = 'Importa un ebook o prova il demo locale';
+  var _status = 'Importa un ebook o prova il testo locale';
   String? _importError;
   var _libraryBooks = <LibraryBook>[];
 
   @override
   void initState() {
     super.initState();
-    _book = _demoBook();
+    _book = _starterBook();
     _reader = _newReaderFor(_book, initialMode: _mode);
     _loadLibrary();
   }
@@ -209,7 +209,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
 
   void _replaceBook(PizzaBook book) {
     _timer?.cancel();
-    setState(() {
+    _setStateAndRefreshWorkspace(() {
       _book = book;
       _reader = _newReaderFor(book, initialMode: _mode);
       _isPlaying = false;
@@ -279,9 +279,9 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
       }
 
       final book = _importer.importBytes(bytes, fileName: file.name);
-      final pbBytes = _codec.encode(book);
+      final readerBytes = _codec.encode(book);
       await widget.libraryRepository.uploadBook(
-        bytes: pbBytes,
+        bytes: readerBytes,
         title: book.title,
         author: book.author,
         sourceFileName: file.name,
@@ -306,6 +306,96 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
         _importError = 'Import fallito: $error';
         _status = _importError!;
         _importBusy = false;
+      });
+    }
+  }
+
+  Future<void> _confirmDeleteLibraryBook(LibraryBook book) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Elimina libro'),
+          content: Text(
+            'Vuoi eliminare "${book.title}" dalla libreria? '
+            'L\'azione non puo essere annullata.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annulla'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Elimina'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deleteLibraryBook(book);
+    }
+  }
+
+  Future<void> _openLibraryBook(LibraryBook book) async {
+    if (book.id == _book.id) {
+      return;
+    }
+
+    _stopTimedReading();
+    _setStateAndRefreshWorkspace(() {
+      _status = 'Apro ${book.title}';
+      _importError = null;
+    });
+
+    try {
+      final bytes = await widget.libraryRepository.downloadBookBytes(book);
+      final selectedBook = _codec.decodeBytes(bytes);
+      if (!mounted) {
+        return;
+      }
+      _replaceBook(selectedBook);
+      _setStateAndRefreshWorkspace(() {
+        _status = 'Aperto ${selectedBook.title}';
+      });
+    } on Object catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _setStateAndRefreshWorkspace(() {
+        _status = 'Apertura fallita: $error';
+      });
+    }
+  }
+
+  Future<void> _deleteLibraryBook(LibraryBook book) async {
+    _stopTimedReading();
+    _setStateAndRefreshWorkspace(() {
+      _status = 'Elimino ${book.title}';
+    });
+
+    try {
+      final wasActive = book.id == _book.id;
+      await widget.libraryRepository.deleteBook(book.id);
+      await _loadLibrary();
+      if (!mounted) {
+        return;
+      }
+      if (wasActive) {
+        _replaceBook(_starterBook());
+      }
+      _setStateAndRefreshWorkspace(() {
+        _status = 'Eliminato ${book.title}';
+      });
+    } on Object catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _setStateAndRefreshWorkspace(() {
+        _status = 'Eliminazione fallita: $error';
       });
     }
   }
@@ -515,8 +605,16 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     return _tokenizer.tokenize(_book.chapters[chapterIndex].text);
   }
 
-  int _wordCountForChapter(int chapterIndex) {
-    return _wordMapForChapter(chapterIndex).words.length;
+  String _durationLabelForChapter(int chapterIndex) {
+    final words = _wordMapForChapter(chapterIndex).words;
+    final durations = ReadingPace(
+      wordsPerMinute: _wpm.round(),
+    ).durationsFor(words);
+    final micros = durations.fold<int>(
+      0,
+      (total, duration) => total + duration.inMicroseconds,
+    );
+    return _formatReadingDuration(Duration(microseconds: micros));
   }
 
   @override
@@ -541,8 +639,10 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
             book: _book,
             libraryBooks: _libraryBooks,
             activeChapterIndex: _reader.position.chapterIndex,
-            wordCountForChapter: _wordCountForChapter,
+            durationLabelForChapter: _durationLabelForChapter,
             onChapterSelected: _selectChapter,
+            onOpenBook: _openLibraryBook,
+            onDeleteBook: _confirmDeleteLibraryBook,
           ),
         ),
         const VerticalDivider(width: 1),
@@ -888,7 +988,7 @@ class _ControlRail extends StatelessWidget {
           _ChapterPanel(
             book: state._book,
             activeChapterIndex: state._reader.position.chapterIndex,
-            wordCountForChapter: state._wordCountForChapter,
+            durationLabelForChapter: state._durationLabelForChapter,
             onChapterSelected: state._selectChapter,
           ),
         ],
@@ -1339,13 +1439,13 @@ class _ChapterPanel extends StatelessWidget {
   const _ChapterPanel({
     required this.book,
     required this.activeChapterIndex,
-    required this.wordCountForChapter,
+    required this.durationLabelForChapter,
     required this.onChapterSelected,
   });
 
   final PizzaBook book;
   final int activeChapterIndex;
-  final int Function(int index) wordCountForChapter;
+  final String Function(int index) durationLabelForChapter;
   final ValueChanged<int> onChapterSelected;
 
   @override
@@ -1359,7 +1459,7 @@ class _ChapterPanel extends StatelessWidget {
               padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
               child: _ChapterTile(
                 chapter: book.chapters[i],
-                wordCount: wordCountForChapter(i),
+                durationLabel: durationLabelForChapter(i),
                 active: i == activeChapterIndex,
                 onTap: () => onChapterSelected(i),
               ),
@@ -1442,12 +1542,17 @@ class _MobileWorkspaceSheet extends StatelessWidget {
                 book: state._book,
                 storedBook: activeStoredBook,
                 libraryBooks: state._libraryBooks,
+                onOpenBook: (book) {
+                  Navigator.of(context).pop();
+                  state._openLibraryBook(book);
+                },
+                onDeleteBook: state._confirmDeleteLibraryBook,
               ),
               const SizedBox(height: 22),
               _ChapterPanel(
                 book: state._book,
                 activeChapterIndex: state._reader.position.chapterIndex,
-                wordCountForChapter: state._wordCountForChapter,
+                durationLabelForChapter: state._durationLabelForChapter,
                 onChapterSelected: (index) {
                   Navigator.of(context).pop();
                   state._selectChapter(index);
@@ -1466,14 +1571,19 @@ class _MobileLibrarySection extends StatelessWidget {
     required this.book,
     required this.storedBook,
     required this.libraryBooks,
+    required this.onOpenBook,
+    required this.onDeleteBook,
   });
 
   final PizzaBook book;
   final LibraryBook? storedBook;
   final List<LibraryBook> libraryBooks;
+  final ValueChanged<LibraryBook> onOpenBook;
+  final ValueChanged<LibraryBook> onDeleteBook;
 
   @override
   Widget build(BuildContext context) {
+    final otherBooks = _otherLibraryBooks(libraryBooks, activeBook: book);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1489,23 +1599,31 @@ class _MobileLibrarySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        _ActiveBookCard(book: book, storedBook: storedBook),
+        _ActiveBookCard(
+          book: book,
+          storedBook: storedBook,
+          onDelete: storedBook == null ? null : () => onDeleteBook(storedBook!),
+        ),
         const SizedBox(height: 12),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
           child: libraryBooks.isEmpty
               ? const _LibraryEmptyState(key: ValueKey('mobile-empty-library'))
+              : otherBooks.isEmpty
+              ? const _LibraryCurrentOnlyState(
+                  key: ValueKey('mobile-current-only-library'),
+                )
               : Column(
-                  key: ValueKey(
-                    'mobile-library-${libraryBooks.length}-${book.id}',
-                  ),
+                  key: ValueKey('mobile-library-${otherBooks.length}'),
                   children: [
-                    for (var i = 0; i < libraryBooks.length; i++)
+                    for (var i = 0; i < otherBooks.length; i++)
                       Padding(
                         padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
                         child: _LibraryBookCard(
-                          book: libraryBooks[i],
-                          active: libraryBooks[i].id == book.id,
+                          book: otherBooks[i],
+                          active: false,
+                          onOpen: () => onOpenBook(otherBooks[i]),
+                          onDelete: () => onDeleteBook(otherBooks[i]),
                         ),
                       ),
                   ],
@@ -1569,15 +1687,19 @@ class _LibraryRail extends StatelessWidget {
     required this.book,
     required this.libraryBooks,
     required this.activeChapterIndex,
-    required this.wordCountForChapter,
+    required this.durationLabelForChapter,
     required this.onChapterSelected,
+    required this.onOpenBook,
+    required this.onDeleteBook,
   });
 
   final PizzaBook book;
   final List<LibraryBook> libraryBooks;
   final int activeChapterIndex;
-  final int Function(int index) wordCountForChapter;
+  final String Function(int index) durationLabelForChapter;
   final ValueChanged<int> onChapterSelected;
+  final ValueChanged<LibraryBook> onOpenBook;
+  final ValueChanged<LibraryBook> onDeleteBook;
 
   @override
   Widget build(BuildContext context) {
@@ -1588,6 +1710,7 @@ class _LibraryRail extends StatelessWidget {
         break;
       }
     }
+    final otherBooks = _otherLibraryBooks(libraryBooks, activeBook: book);
 
     return ColoredBox(
       color: PizzaColors.paper.withValues(alpha: 0.82),
@@ -1596,21 +1719,7 @@ class _LibraryRail extends StatelessWidget {
         children: [
           Row(
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: PizzaColors.paperAlt,
-                  border: Border.all(color: PizzaColors.line),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const SizedBox.square(
-                  dimension: 52,
-                  child: Icon(
-                    Icons.auto_stories_rounded,
-                    color: PizzaColors.blueCheese,
-                    size: 30,
-                  ),
-                ),
-              ),
+              const _PizzaFaviconMark(size: 52),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -1625,7 +1734,13 @@ class _LibraryRail extends StatelessWidget {
           const SizedBox(height: 24),
           Text('In lettura', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
-          _ActiveBookCard(book: book, storedBook: activeStoredBook),
+          _ActiveBookCard(
+            book: book,
+            storedBook: activeStoredBook,
+            onDelete: activeStoredBook == null
+                ? null
+                : () => onDeleteBook(activeStoredBook!),
+          ),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -1643,15 +1758,21 @@ class _LibraryRail extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             child: libraryBooks.isEmpty
                 ? const _LibraryEmptyState(key: ValueKey('empty-library'))
+                : otherBooks.isEmpty
+                ? const _LibraryCurrentOnlyState(
+                    key: ValueKey('current-only-library'),
+                  )
                 : Column(
-                    key: ValueKey('library-${libraryBooks.length}-${book.id}'),
+                    key: ValueKey('library-${otherBooks.length}'),
                     children: [
-                      for (var i = 0; i < libraryBooks.length; i++)
+                      for (var i = 0; i < otherBooks.length; i++)
                         Padding(
                           padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
                           child: _LibraryBookCard(
-                            book: libraryBooks[i],
-                            active: libraryBooks[i].id == book.id,
+                            book: otherBooks[i],
+                            active: false,
+                            onOpen: () => onOpenBook(otherBooks[i]),
+                            onDelete: () => onDeleteBook(otherBooks[i]),
                           ),
                         ),
                     ],
@@ -1665,7 +1786,7 @@ class _LibraryRail extends StatelessWidget {
               padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
               child: _ChapterTile(
                 chapter: book.chapters[i],
-                wordCount: wordCountForChapter(i),
+                durationLabel: durationLabelForChapter(i),
                 active: i == activeChapterIndex,
                 onTap: () => onChapterSelected(i),
               ),
@@ -1677,10 +1798,15 @@ class _LibraryRail extends StatelessWidget {
 }
 
 class _ActiveBookCard extends StatelessWidget {
-  const _ActiveBookCard({required this.book, required this.storedBook});
+  const _ActiveBookCard({
+    required this.book,
+    required this.storedBook,
+    required this.onDelete,
+  });
 
   final PizzaBook book;
   final LibraryBook? storedBook;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1715,6 +1841,15 @@ class _ActiveBookCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                if (stored != null && onDelete != null) ...[
+                  const SizedBox(width: 6),
+                  IconButton(
+                    key: ValueKey('delete-book-${stored.id}'),
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    tooltip: 'Elimina libro',
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
@@ -1752,100 +1887,155 @@ class _ActiveBookCard extends StatelessWidget {
   }
 }
 
-class _LibraryBookCard extends StatelessWidget {
-  const _LibraryBookCard({required this.book, required this.active});
+class _PizzaFaviconMark extends StatelessWidget {
+  const _PizzaFaviconMark({required this.size});
 
-  final LibraryBook book;
-  final bool active;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        color: active ? PizzaColors.dough : PizzaColors.paper,
-        border: Border.all(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.asset(
+        'assets/brand/pizza-favicon.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+}
+
+class _LibraryBookCard extends StatelessWidget {
+  const _LibraryBookCard({
+    required this.book,
+    required this.active,
+    required this.onOpen,
+    required this.onDelete,
+  });
+
+  final LibraryBook book;
+  final bool active;
+  final VoidCallback onOpen;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(8);
+    return Material(
+      color: active ? PizzaColors.dough : PizzaColors.paper,
+      shape: RoundedRectangleBorder(
+        borderRadius: borderRadius,
+        side: BorderSide(
           color: active ? PizzaColors.crust : PizzaColors.line,
           width: active ? 1.4 : 1,
         ),
-        borderRadius: BorderRadius.circular(8),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  active
-                      ? Icons.play_circle_fill_rounded
-                      : Icons.menu_book_rounded,
-                  color: active ? PizzaColors.tomato : PizzaColors.basil,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            if (book.author != null && book.author!.trim().isNotEmpty) ...[
-              const SizedBox(height: 5),
-              Text(
-                book.author!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
-              ),
-            ],
-            const SizedBox(height: 9),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _MetaPill(
-                  icon: active
-                      ? Icons.play_arrow_rounded
-                      : Icons.check_circle_outline_rounded,
-                  label: active ? 'Attivo' : 'Importato',
-                  color: active ? PizzaColors.tomato : PizzaColors.basil,
-                ),
-                _MetaPill(
-                  icon: Icons.data_object_rounded,
-                  label: _formatByteLength(book.byteLength),
-                  color: PizzaColors.blueCheese,
-                ),
-                _MetaPill(
-                  icon: Icons.description_rounded,
-                  label: _libraryBookFormat(book),
-                  color: PizzaColors.crustDeep,
-                ),
-              ],
-            ),
-            if (book.sourceFileName != null &&
-                book.sourceFileName!.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                book.sourceFileName!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
-              ),
-            ],
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: _LibraryBookCardBody(
+            book: book,
+            active: active,
+            onDelete: onDelete,
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _LibraryBookCardBody extends StatelessWidget {
+  const _LibraryBookCardBody({
+    required this.book,
+    required this.active,
+    required this.onDelete,
+  });
+
+  final LibraryBook book;
+  final bool active;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              active ? Icons.play_circle_fill_rounded : Icons.menu_book_rounded,
+              color: active ? PizzaColors.tomato : PizzaColors.basil,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                book.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              key: ValueKey('delete-book-${book.id}'),
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Elimina libro',
+            ),
+          ],
+        ),
+        if (book.author != null && book.author!.trim().isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Text(
+            book.author!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+          ),
+        ],
+        const SizedBox(height: 9),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _MetaPill(
+              icon: active
+                  ? Icons.play_arrow_rounded
+                  : Icons.check_circle_outline_rounded,
+              label: active ? 'Attivo' : 'Importato',
+              color: active ? PizzaColors.tomato : PizzaColors.basil,
+            ),
+            _MetaPill(
+              icon: Icons.data_object_rounded,
+              label: _formatByteLength(book.byteLength),
+              color: PizzaColors.blueCheese,
+            ),
+            _MetaPill(
+              icon: Icons.description_rounded,
+              label: _libraryBookFormat(book),
+              color: PizzaColors.crustDeep,
+            ),
+          ],
+        ),
+        if (book.sourceFileName != null &&
+            book.sourceFileName!.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            book.sourceFileName!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -1877,7 +2067,52 @@ class _LibraryEmptyState extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Il demo locale resta attivo.',
+                    'Il testo locale resta attivo.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryCurrentOnlyState extends StatelessWidget {
+  const _LibraryCurrentOnlyState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PizzaColors.paperAlt.withValues(alpha: 0.62),
+        border: Border.all(color: PizzaColors.line),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_outline_rounded,
+              color: PizzaColors.basil,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nessun altro libro',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Il libro importato e gia in lettura.',
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
@@ -1964,13 +2199,13 @@ class _MetaPill extends StatelessWidget {
 class _ChapterTile extends StatelessWidget {
   const _ChapterTile({
     required this.chapter,
-    required this.wordCount,
+    required this.durationLabel,
     required this.active,
     required this.onTap,
   });
 
   final PizzaChapter chapter;
-  final int wordCount;
+  final String durationLabel;
   final bool active;
   final VoidCallback onTap;
 
@@ -2006,7 +2241,7 @@ class _ChapterTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '$wordCount',
+                durationLabel,
                 style: Theme.of(
                   context,
                 ).textTheme.labelLarge?.copyWith(color: PizzaColors.muted),
@@ -2182,11 +2417,7 @@ class _MobileHeader extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Row(
           children: [
-            const Icon(
-              Icons.auto_stories_rounded,
-              color: PizzaColors.blueCheese,
-              size: 32,
-            ),
+            const _PizzaFaviconMark(size: 32),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -2443,6 +2674,34 @@ String _compactDecimal(double value) {
   return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
 }
 
+String _formatReadingDuration(Duration duration) {
+  final seconds = math.max(1, (duration.inMilliseconds / 1000).round());
+  if (seconds < 60) {
+    return '${seconds}s';
+  }
+
+  final minutes = math.max(1, (seconds / 60).round());
+  if (minutes < 60) {
+    return '${minutes}m';
+  }
+
+  final hours = minutes ~/ 60;
+  final remainingMinutes = minutes % 60;
+  if (remainingMinutes == 0) {
+    return '${hours}h';
+  }
+  return '${hours}h ${remainingMinutes}m';
+}
+
+List<LibraryBook> _otherLibraryBooks(
+  List<LibraryBook> books, {
+  required PizzaBook activeBook,
+}) {
+  return books
+      .where((book) => book.id != activeBook.id)
+      .toList(growable: false);
+}
+
 String _libraryBookFormat(LibraryBook book) {
   final source = _fileExtension(book.sourceFileName);
   return source ?? 'EBOOK';
@@ -2482,15 +2741,15 @@ class _TextLine {
   final int lastWordIndex;
 }
 
-PizzaBook _demoBook() {
+PizzaBook _starterBook() {
   return PizzaBook(
-    id: 'demo-pizza-book',
-    title: 'Demo Ebook',
+    id: 'starter-pizza-book',
+    title: 'Testo locale',
     author: 'Pizza Reader',
     language: 'it',
     metadata: const <String, Object?>{
-      'source_kind': 'demo',
-      'source_file': 'demo.epub',
+      'source_kind': 'local',
+      'source_file': 'testo-locale.epub',
     },
     chapters: const [
       PizzaChapter(
