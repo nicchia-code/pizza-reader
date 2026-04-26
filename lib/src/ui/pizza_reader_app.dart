@@ -158,6 +158,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
           'markdown',
           'html',
           'htm',
+          'fb2',
           'pb',
           'mobi',
           'azw',
