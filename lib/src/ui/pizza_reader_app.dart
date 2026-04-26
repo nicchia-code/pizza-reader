@@ -1616,65 +1616,80 @@ class _MobileWorkspaceSheet extends StatelessWidget {
           initialChildSize: 0.9,
           minChildSize: 0.45,
           maxChildSize: 0.96,
-          builder: (context, scrollController) => ListView(
-            controller: scrollController,
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding),
+          builder: (context, scrollController) => Column(
             children: [
-              Center(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: PizzaColors.line,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const SizedBox(width: 42, height: 4),
+              Padding(
+                key: const ValueKey('mobile-workspace-header'),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  children: [
+                    Center(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: PizzaColors.line,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const SizedBox(width: 42, height: 4),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.account_circle_rounded,
+                          color: PizzaColors.blueCheese,
+                          size: 30,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Account e libreria',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          tooltip: 'Chiudi',
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.account_circle_rounded,
-                    color: PizzaColors.blueCheese,
-                    size: 30,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Account e libreria',
-                      style: Theme.of(context).textTheme.titleLarge,
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+                  children: [
+                    _AuthPanel(state: state),
+                    const SizedBox(height: 18),
+                    _ImportPanel(
+                      busy: state._importBusy,
+                      error: state._importError,
+                      cloudEnabled: state.widget.cloudEnabled,
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        state._importBook();
+                      },
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Chiudi',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _AuthPanel(state: state),
-              const SizedBox(height: 18),
-              _ImportPanel(
-                busy: state._importBusy,
-                error: state._importError,
-                cloudEnabled: state.widget.cloudEnabled,
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  state._importBook();
-                },
-              ),
-              const SizedBox(height: 22),
-              _MobileLibrarySection(
-                book: state._book,
-                storedBook: activeStoredBook,
-                libraryBooks: state._libraryBooks,
-                onOpenBook: (book) {
-                  Navigator.of(context).pop();
-                  state._openLibraryBook(book);
-                },
-                onRenameBook: state._renameLibraryBook,
-                onDeleteBook: state._confirmDeleteLibraryBook,
+                    const SizedBox(height: 22),
+                    _MobileLibrarySection(
+                      book: state._book,
+                      storedBook: activeStoredBook,
+                      libraryBooks: state._libraryBooks,
+                      onOpenBook: (book) {
+                        Navigator.of(context).pop();
+                        state._openLibraryBook(book);
+                      },
+                      onRenameBook: state._renameLibraryBook,
+                      onDeleteBook: state._confirmDeleteLibraryBook,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -235,6 +235,13 @@ void main() {
     );
     await tester.ensureVisible(mobileRenameButton);
     await tester.pumpAndSettle();
+
+    final sheetHeader = find.byKey(const ValueKey('mobile-workspace-header'));
+    expect(sheetHeader, findsOneWidget);
+    expect(tester.getTopLeft(sheetHeader).dy, greaterThanOrEqualTo(0));
+    expect(tester.getBottomRight(sheetHeader).dy, lessThan(760));
+    expect(find.byTooltip('Chiudi'), findsOneWidget);
+
     await tester.tap(mobileRenameButton);
     await tester.pumpAndSettle();
     await tester.enterText(
