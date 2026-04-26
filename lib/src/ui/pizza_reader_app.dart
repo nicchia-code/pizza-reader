@@ -164,7 +164,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   late PizzaBook _book;
   late reader.ReaderController _reader;
   var _mode = reader.ReaderMode.auto;
-  var _wpm = 360.0;
+  var _wpm = 200.0;
   var _isPlaying = false;
   var _textMapOpen = false;
   var _importBusy = false;
@@ -669,14 +669,10 @@ class _ReaderTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 10,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      alignment: WrapAlignment.spaceBetween,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -693,6 +689,7 @@ class _ReaderTopBar extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(width: 12),
         Tooltip(
           message: 'Apri testo normale',
           child: IconButton.filledTonal(

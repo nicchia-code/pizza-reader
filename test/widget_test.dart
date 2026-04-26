@@ -78,7 +78,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('360'), findsOneWidget);
+    expect(find.text('200'), findsOneWidget);
     expect(find.text('WPM'), findsOneWidget);
     expect(find.text('Modalita'), findsNothing);
 
