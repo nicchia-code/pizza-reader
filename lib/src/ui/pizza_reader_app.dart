@@ -158,6 +158,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   final _tokenizer = const WordTokenizer();
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
+  final _workspaceRevision = ValueNotifier<int>(0);
 
   Timer? _timer;
   late PizzaBook _book;
@@ -184,6 +185,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   @override
   void dispose() {
     _timer?.cancel();
+    _workspaceRevision.dispose();
     _emailController.dispose();
     _otpController.dispose();
     final auth = widget.authRepository;
@@ -222,13 +224,18 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
       if (!mounted) {
         return;
       }
-      setState(() => _libraryBooks = books);
+      _setStateAndRefreshWorkspace(() => _libraryBooks = books);
     } catch (_) {
       if (!mounted) {
         return;
       }
-      setState(() => _libraryBooks = const []);
+      _setStateAndRefreshWorkspace(() => _libraryBooks = const []);
     }
+  }
+
+  void _setStateAndRefreshWorkspace(VoidCallback update) {
+    setState(update);
+    _workspaceRevision.value++;
   }
 
   Future<void> _importBook() async {
@@ -307,21 +314,21 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     if (_authBusy) {
       return;
     }
-    setState(() {
+    _setStateAndRefreshWorkspace(() {
       _authBusy = true;
       _status = 'Invio codice';
     });
     try {
       await widget.authRepository.sendMagicCode(_emailController.text);
-      setState(() {
+      _setStateAndRefreshWorkspace(() {
         _codeSent = true;
         _status = 'Codice inviato a ${normalizeEmail(_emailController.text)}';
       });
     } on Object catch (error) {
-      setState(() => _status = 'Login: $error');
+      _setStateAndRefreshWorkspace(() => _status = 'Login: $error');
     } finally {
       if (mounted) {
-        setState(() => _authBusy = false);
+        _setStateAndRefreshWorkspace(() => _authBusy = false);
       }
     }
   }
@@ -330,7 +337,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     if (_authBusy) {
       return;
     }
-    setState(() {
+    _setStateAndRefreshWorkspace(() {
       _authBusy = true;
       _status = 'Verifica codice';
     });
@@ -340,16 +347,16 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
         _otpController.text,
       );
       await _loadLibrary();
-      setState(() {
+      _setStateAndRefreshWorkspace(() {
         _codeSent = false;
         _otpController.clear();
         _status = 'Login completato';
       });
     } on Object catch (error) {
-      setState(() => _status = 'Codice non valido: $error');
+      _setStateAndRefreshWorkspace(() => _status = 'Codice non valido: $error');
     } finally {
       if (mounted) {
-        setState(() => _authBusy = false);
+        _setStateAndRefreshWorkspace(() => _authBusy = false);
       }
     }
   }
@@ -358,21 +365,21 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     if (_authBusy) {
       return;
     }
-    setState(() {
+    _setStateAndRefreshWorkspace(() {
       _authBusy = true;
       _status = 'Logout in corso';
     });
     try {
       await widget.authRepository.signOut();
       await _loadLibrary();
-      setState(() {
+      _setStateAndRefreshWorkspace(() {
         _codeSent = false;
         _otpController.clear();
         _status = 'Logout completato';
       });
     } finally {
       if (mounted) {
-        setState(() => _authBusy = false);
+        _setStateAndRefreshWorkspace(() => _authBusy = false);
       }
     }
   }
@@ -1388,81 +1395,86 @@ class _MobileWorkspaceSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    LibraryBook? activeStoredBook;
-    for (final stored in state._libraryBooks) {
-      if (stored.id == state._book.id) {
-        activeStoredBook = stored;
-        break;
-      }
-    }
+    return ValueListenableBuilder<int>(
+      valueListenable: state._workspaceRevision,
+      builder: (context, _, _) {
+        LibraryBook? activeStoredBook;
+        for (final stored in state._libraryBooks) {
+          if (stored.id == state._book.id) {
+            activeStoredBook = stored;
+            break;
+          }
+        }
 
-    final bottomPadding = MediaQuery.paddingOf(context).bottom + 18;
-    return FractionallySizedBox(
-      heightFactor: 0.9,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding),
-        children: [
-          Center(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: PizzaColors.line,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const SizedBox(width: 42, height: 4),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
+        final bottomPadding = MediaQuery.paddingOf(context).bottom + 18;
+        return FractionallySizedBox(
+          heightFactor: 0.9,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding),
             children: [
-              const Icon(
-                Icons.account_circle_rounded,
-                color: PizzaColors.blueCheese,
-                size: 30,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Account e libreria',
-                  style: Theme.of(context).textTheme.titleLarge,
+              Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: PizzaColors.line,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const SizedBox(width: 42, height: 4),
                 ),
               ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-                tooltip: 'Chiudi',
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.account_circle_rounded,
+                    color: PizzaColors.blueCheese,
+                    size: 30,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Account e libreria',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Chiudi',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _AuthPanel(state: state),
+              const SizedBox(height: 18),
+              _ImportPanel(
+                busy: state._importBusy,
+                error: state._importError,
+                cloudEnabled: state.widget.cloudEnabled,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  state._importBook();
+                },
+              ),
+              const SizedBox(height: 22),
+              _MobileLibrarySection(
+                book: state._book,
+                storedBook: activeStoredBook,
+                libraryBooks: state._libraryBooks,
+              ),
+              const SizedBox(height: 22),
+              _ChapterPanel(
+                book: state._book,
+                activeChapterIndex: state._reader.position.chapterIndex,
+                wordCountForChapter: state._wordCountForChapter,
+                onChapterSelected: (index) {
+                  Navigator.of(context).pop();
+                  state._selectChapter(index);
+                },
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _AuthPanel(state: state),
-          const SizedBox(height: 18),
-          _ImportPanel(
-            busy: state._importBusy,
-            error: state._importError,
-            cloudEnabled: state.widget.cloudEnabled,
-            onPressed: () {
-              Navigator.of(context).pop();
-              state._importBook();
-            },
-          ),
-          const SizedBox(height: 22),
-          _MobileLibrarySection(
-            book: state._book,
-            storedBook: activeStoredBook,
-            libraryBooks: state._libraryBooks,
-          ),
-          const SizedBox(height: 22),
-          _ChapterPanel(
-            book: state._book,
-            activeChapterIndex: state._reader.position.chapterIndex,
-            wordCountForChapter: state._wordCountForChapter,
-            onChapterSelected: (index) {
-              Navigator.of(context).pop();
-              state._selectChapter(index);
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -102,6 +102,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('updates mobile auth feedback without reopening the sheet', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(390, 760));
+
+    final authRepository = FakeAuthRepository();
+    await tester.pumpWidget(PizzaReaderApp(authRepository: authRepository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Account e libreria'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Email'),
+      'reader@example.test',
+    );
+    await tester.tap(find.text('Invia'));
+    await tester.pumpAndSettle();
+
+    expect(authRepository.sentMagicCodeEmails, ['reader@example.test']);
+    expect(find.text('Verifica'), findsOneWidget);
+    expect(find.text('Codice inviato. Inseriscilo qui.'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Code'), '123456');
+    await tester.tap(find.text('Verifica'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connesso'), findsOneWidget);
+    expect(find.text('reader@example.test'), findsOneWidget);
+    expect(find.text('Esci dall\'account'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the pizza logo only on the loading screen', (
     tester,
   ) async {
