@@ -741,21 +741,6 @@ class _WordFocusDisplay extends StatelessWidget {
                 ),
               ),
             ),
-            if (constraints.maxHeight >= 132) ...[
-              const SizedBox(height: 18),
-              SizedBox(
-                width: math.min(520, constraints.maxWidth * 0.82),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: progress.clamp(0, 1),
-                    minHeight: 6,
-                    backgroundColor: PizzaColors.line,
-                    valueColor: const AlwaysStoppedAnimation(PizzaColors.basil),
-                  ),
-                ),
-              ),
-            ],
           ],
         );
       },
