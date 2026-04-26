@@ -33,12 +33,13 @@ Book objects are uploaded under:
 That path is part of the Storage RLS policy, so clients must be signed in before
 uploading with the real `SupabaseLibraryRepository`.
 
-The stored object body is normalized reader JSON encoded as UTF-8 and uploaded
-with content type `application/json`.
+The stored object body is normalized reader JSON compressed with gzip and
+uploaded with content type `application/octet-stream`. Older uncompressed JSON
+objects remain readable.
 
 `SupabaseLibraryRepository` supports the full book lifecycle:
 
-- `uploadBook` stores normalized reader JSON in Storage and upserts metadata in
+- `uploadBook` stores compressed reader JSON in Storage and upserts metadata in
   `public.books`;
 - `downloadBookBytes` downloads the stored reader object for a listed
   `LibraryBook`;
