@@ -61,7 +61,15 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.byKey(const ValueKey('rename-book-starter-pizza-book')),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const ValueKey('delete-book-roadside-notes')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('rename-book-roadside-notes')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -130,6 +138,118 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('selects chapters inside the book overlay', (tester) async {
+    _setViewport(tester, const Size(1400, 900));
+
+    await tester.pumpWidget(PizzaReaderApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Apri libro'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('book-chapter-selector')), findsOneWidget);
+    expect(find.byKey(const ValueKey('book-text-lines')), findsNothing);
+    expect(find.text('Capitoli'), findsOneWidget);
+    expect(find.text('Testo'), findsNothing);
+
+    await tester.tap(find.text('Cottura').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('book-chapter-selector')), findsNothing);
+    expect(find.textContaining('Cottura selezionato'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renames imported books from the library profile', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(1400, 900));
+
+    final libraryRepository = await _seedSelectableLibrary();
+    await tester.pumpWidget(
+      PizzaReaderApp(
+        authRepository: FakeAuthRepository(
+          signedInUserId: 'fake-user',
+          signedInEmail: 'reader@example.test',
+        ),
+        libraryRepository: libraryRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final renameButton = find.byKey(
+      const ValueKey('rename-book-roadside-notes'),
+    );
+    await tester.ensureVisible(renameButton);
+    await tester.pumpAndSettle();
+    await tester.tap(renameButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rinomina libro'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Titolo'),
+      'Roadside Renamed',
+    );
+    await tester.tap(find.text('Rinomina').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Roadside Renamed'), findsOneWidget);
+    expect(find.text('Roadside Notes'), findsNothing);
+
+    final renamed = (await libraryRepository.listBooks()).single;
+    expect(renamed.title, 'Roadside Renamed');
+    expect(
+      const PizzaBookCodec()
+          .decodeBytes(await libraryRepository.downloadBookBytes(renamed))
+          .title,
+      'Roadside Renamed',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renames books in the open mobile profile immediately', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(390, 760));
+
+    final libraryRepository = await _seedSelectableLibrary();
+    await tester.pumpWidget(
+      PizzaReaderApp(
+        authRepository: FakeAuthRepository(
+          signedInUserId: 'fake-user',
+          signedInEmail: 'reader@example.test',
+        ),
+        libraryRepository: libraryRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Account e libreria'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Libreria'), findsOneWidget);
+
+    final mobileRenameButton = find.byKey(
+      const ValueKey('rename-book-roadside-notes'),
+    );
+    await tester.ensureVisible(mobileRenameButton);
+    await tester.pumpAndSettle();
+    await tester.tap(mobileRenameButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Titolo'),
+      'Roadside Mobile',
+    );
+    await tester.tap(find.text('Rinomina').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Libreria'), findsOneWidget);
+    expect(find.text('Roadside Mobile'), findsOneWidget);
+    expect(find.text('Roadside Notes'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps the mobile viewport compact', (tester) async {
     _setViewport(tester, const Size(390, 760));
 
@@ -145,10 +265,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byTooltip('Importa ebook'), findsOneWidget);
+    expect(find.text('Importa ebook'), findsNothing);
     expect(
       find.descendant(
-        of: find.byTooltip('Apri testo normale'),
+        of: find.byTooltip('Apri libro'),
         matching: find.byIcon(Icons.menu_book_rounded),
       ),
       findsOneWidget,
@@ -156,6 +276,16 @@ void main() {
     expect(find.text('200'), findsOneWidget);
     expect(find.text('WPM'), findsOneWidget);
     expect(find.text('Modalita'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('speed-readout-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('tempo'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('speed-readout-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WPM'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Account e libreria'));
     await tester.pumpAndSettle();
@@ -169,6 +299,7 @@ void main() {
     );
     expect(find.text('Libreria'), findsOneWidget);
     expect(find.text('Nessun libro importato'), findsOneWidget);
+    expect(find.text('Importa ebook'), findsOneWidget);
 
     await tester.enterText(find.widgetWithText(TextField, 'Code'), '123456');
     await tester.pump();

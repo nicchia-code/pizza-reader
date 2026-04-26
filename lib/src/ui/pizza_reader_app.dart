@@ -170,6 +170,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   var _importBusy = false;
   var _authBusy = false;
   var _codeSent = false;
+  var _showReadingTime = false;
   var _status = 'Importa un ebook o prova il testo locale';
   String? _importError;
   var _libraryBooks = <LibraryBook>[];
@@ -231,6 +232,25 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
       }
       _setStateAndRefreshWorkspace(() => _libraryBooks = const []);
     }
+  }
+
+  void _applyLibraryTitleLocally(
+    String bookId,
+    String title, {
+    String? status,
+  }) {
+    _setStateAndRefreshWorkspace(() {
+      _libraryBooks = [
+        for (final stored in _libraryBooks)
+          stored.id == bookId ? stored.copyWith(title: title) : stored,
+      ];
+      if (_book.id == bookId) {
+        _book = _book.copyWith(title: title);
+      }
+      if (status != null) {
+        _status = status;
+      }
+    });
   }
 
   void _setStateAndRefreshWorkspace(VoidCallback update) {
@@ -337,6 +357,68 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
 
     if (confirmed == true) {
       await _deleteLibraryBook(book);
+    }
+  }
+
+  Future<void> _renameLibraryBook(LibraryBook book) async {
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (context) => _RenameBookDialog(initialTitle: book.title),
+    );
+
+    final title = newTitle?.trim();
+    if (title == null || title.isEmpty || title == book.title.trim()) {
+      return;
+    }
+
+    _stopTimedReading();
+    _applyLibraryTitleLocally(book.id, title, status: 'Rinominato in $title');
+
+    try {
+      PizzaBook? renamedReaderBook;
+      try {
+        final bytes = await widget.libraryRepository.downloadBookBytes(book);
+        final decodedBook = _codec.decodeBytes(bytes);
+        renamedReaderBook = decodedBook.copyWith(title: title);
+        await widget.libraryRepository.uploadBook(
+          bytes: _codec.encode(renamedReaderBook),
+          title: title,
+          author: renamedReaderBook.author,
+          sourceFileName: book.sourceFileName,
+          bookId: book.id,
+        );
+      } on Object {
+        await widget.libraryRepository.upsertBookMetadata(
+          book.copyWith(title: title),
+        );
+        if (book.id == _book.id) {
+          renamedReaderBook = _book.copyWith(title: title);
+        }
+      }
+
+      await _loadLibrary();
+      if (!mounted) {
+        return;
+      }
+      if (book.id == _book.id && renamedReaderBook != null) {
+        _setStateAndRefreshWorkspace(() => _book = renamedReaderBook!);
+      }
+      _setStateAndRefreshWorkspace(() {
+        _status = 'Rinominato in $title';
+      });
+    } on Object catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await _loadLibrary();
+      if (book.id == _book.id) {
+        _setStateAndRefreshWorkspace(
+          () => _book = _book.copyWith(title: book.title),
+        );
+      }
+      _setStateAndRefreshWorkspace(() {
+        _status = 'Rinomina fallita: $error';
+      });
     }
   }
 
@@ -503,6 +585,32 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     }
   }
 
+  void _toggleSpeedReadout() {
+    setState(() => _showReadingTime = !_showReadingTime);
+  }
+
+  _SpeedReadoutValue _speedReadoutValue() {
+    if (_showReadingTime) {
+      final durationLabel = _durationLabelForChapter(
+        _reader.position.chapterIndex,
+      );
+      return _SpeedReadoutValue(
+        primary: durationLabel,
+        secondary: 'tempo',
+        inline: durationLabel,
+        tooltip: 'Mostra WPM',
+      );
+    }
+
+    final wpm = _wpm.round();
+    return _SpeedReadoutValue(
+      primary: '$wpm',
+      secondary: 'WPM',
+      inline: '$wpm WPM',
+      tooltip: 'Mostra tempo',
+    );
+  }
+
   void _toggleAuto() {
     if (_mode != reader.ReaderMode.auto) {
       _setMode(reader.ReaderMode.auto);
@@ -575,7 +683,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     });
   }
 
-  void _selectChapter(int index) {
+  void _selectChapterInBook(int index) {
     _stopTimedReading();
     setState(() {
       _reader.seekChapter(index);
@@ -638,10 +746,8 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
           child: _LibraryRail(
             book: _book,
             libraryBooks: _libraryBooks,
-            activeChapterIndex: _reader.position.chapterIndex,
-            durationLabelForChapter: _durationLabelForChapter,
-            onChapterSelected: _selectChapter,
             onOpenBook: _openLibraryBook,
+            onRenameBook: _renameLibraryBook,
             onDeleteBook: _confirmDeleteLibraryBook,
           ),
         ),
@@ -661,7 +767,6 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
           importBusy: _importBusy,
           importError: _importError,
           onOpenWorkspace: _openMobileWorkspace,
-          onImport: _importBook,
         ),
         const Divider(height: 1),
         Expanded(child: _ReaderStage(state: this, compact: true)),
@@ -742,10 +847,13 @@ class _ReaderStage extends StatelessWidget {
         if (state._textMapOpen)
           Positioned.fill(
             child: _NormalTextOverlay(
-              chapter: chapter,
+              book: state._book,
+              activeChapterIndex: state._reader.position.chapterIndex,
+              durationLabelForChapter: state._durationLabelForChapter,
               wordMap: wordMap,
               activeWordIndex: state._reader.position.wordIndex,
               onClose: state._closeTextMap,
+              onChapterSelected: state._selectChapterInBook,
               onJump: state._jumpToOffset,
             ),
           ),
@@ -791,7 +899,7 @@ class _ReaderTopBar extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Tooltip(
-          message: 'Apri testo normale',
+          message: 'Apri libro',
           child: IconButton.filledTonal(
             onPressed: onOpenText,
             icon: const Icon(Icons.menu_book_rounded),
@@ -984,13 +1092,6 @@ class _ControlRail extends StatelessWidget {
           _SpeedPanel(state: state),
           const SizedBox(height: 20),
           _ModePanel(state: state),
-          const SizedBox(height: 20),
-          _ChapterPanel(
-            book: state._book,
-            activeChapterIndex: state._reader.position.chapterIndex,
-            durationLabelForChapter: state._durationLabelForChapter,
-            onChapterSelected: state._selectChapter,
-          ),
         ],
       ),
     );
@@ -1124,6 +1225,59 @@ class _SignedOutAuthContent extends StatelessWidget {
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+        ),
+      ],
+    );
+  }
+}
+
+class _RenameBookDialog extends StatefulWidget {
+  const _RenameBookDialog({required this.initialTitle});
+
+  final String initialTitle;
+
+  @override
+  State<_RenameBookDialog> createState() => _RenameBookDialogState();
+}
+
+class _RenameBookDialogState extends State<_RenameBookDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialTitle);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rinomina libro'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          labelText: 'Titolo',
+          prefixIcon: Icon(Icons.drive_file_rename_outline_rounded),
+        ),
+        onSubmitted: (value) => Navigator.of(context).pop(value.trim()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annulla'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          icon: const Icon(Icons.check_rounded),
+          label: const Text('Rinomina'),
         ),
       ],
     );
@@ -1381,13 +1535,13 @@ class _SpeedPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final readout = state._speedReadoutValue();
     return _PanelShell(
       title: 'Velocita',
-      trailing: Text(
-        '${state._wpm.round()} WPM',
-        style: Theme.of(
-          context,
-        ).textTheme.labelLarge?.copyWith(color: PizzaColors.tomatoDeep),
+      trailing: _SpeedReadoutToggle(
+        value: readout,
+        onTap: state._toggleSpeedReadout,
+        compact: false,
       ),
       child: Slider(
         value: state._wpm,
@@ -1435,41 +1589,6 @@ class _ModePanel extends StatelessWidget {
   }
 }
 
-class _ChapterPanel extends StatelessWidget {
-  const _ChapterPanel({
-    required this.book,
-    required this.activeChapterIndex,
-    required this.durationLabelForChapter,
-    required this.onChapterSelected,
-  });
-
-  final PizzaBook book;
-  final int activeChapterIndex;
-  final String Function(int index) durationLabelForChapter;
-  final ValueChanged<int> onChapterSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return _PanelShell(
-      title: 'Capitoli',
-      child: Column(
-        children: [
-          for (var i = 0; i < book.chapters.length; i++)
-            Padding(
-              padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
-              child: _ChapterTile(
-                chapter: book.chapters[i],
-                durationLabel: durationLabelForChapter(i),
-                active: i == activeChapterIndex,
-                onTap: () => onChapterSelected(i),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MobileWorkspaceSheet extends StatelessWidget {
   const _MobileWorkspaceSheet({required this.state});
 
@@ -1488,10 +1607,18 @@ class _MobileWorkspaceSheet extends StatelessWidget {
           }
         }
 
-        final bottomPadding = MediaQuery.paddingOf(context).bottom + 18;
-        return FractionallySizedBox(
-          heightFactor: 0.9,
-          child: ListView(
+        final bottomPadding =
+            MediaQuery.paddingOf(context).bottom +
+            MediaQuery.viewInsetsOf(context).bottom +
+            18;
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.9,
+          minChildSize: 0.45,
+          maxChildSize: 0.96,
+          builder: (context, scrollController) => ListView(
+            controller: scrollController,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding),
             children: [
               Center(
@@ -1546,17 +1673,8 @@ class _MobileWorkspaceSheet extends StatelessWidget {
                   Navigator.of(context).pop();
                   state._openLibraryBook(book);
                 },
+                onRenameBook: state._renameLibraryBook,
                 onDeleteBook: state._confirmDeleteLibraryBook,
-              ),
-              const SizedBox(height: 22),
-              _ChapterPanel(
-                book: state._book,
-                activeChapterIndex: state._reader.position.chapterIndex,
-                durationLabelForChapter: state._durationLabelForChapter,
-                onChapterSelected: (index) {
-                  Navigator.of(context).pop();
-                  state._selectChapter(index);
-                },
               ),
             ],
           ),
@@ -1572,6 +1690,7 @@ class _MobileLibrarySection extends StatelessWidget {
     required this.storedBook,
     required this.libraryBooks,
     required this.onOpenBook,
+    required this.onRenameBook,
     required this.onDeleteBook,
   });
 
@@ -1579,6 +1698,7 @@ class _MobileLibrarySection extends StatelessWidget {
   final LibraryBook? storedBook;
   final List<LibraryBook> libraryBooks;
   final ValueChanged<LibraryBook> onOpenBook;
+  final ValueChanged<LibraryBook> onRenameBook;
   final ValueChanged<LibraryBook> onDeleteBook;
 
   @override
@@ -1602,6 +1722,7 @@ class _MobileLibrarySection extends StatelessWidget {
         _ActiveBookCard(
           book: book,
           storedBook: storedBook,
+          onRename: storedBook == null ? null : () => onRenameBook(storedBook!),
           onDelete: storedBook == null ? null : () => onDeleteBook(storedBook!),
         ),
         const SizedBox(height: 12),
@@ -1623,6 +1744,7 @@ class _MobileLibrarySection extends StatelessWidget {
                           book: otherBooks[i],
                           active: false,
                           onOpen: () => onOpenBook(otherBooks[i]),
+                          onRename: () => onRenameBook(otherBooks[i]),
                           onDelete: () => onDeleteBook(otherBooks[i]),
                         ),
                       ),
@@ -1686,19 +1808,15 @@ class _LibraryRail extends StatelessWidget {
   const _LibraryRail({
     required this.book,
     required this.libraryBooks,
-    required this.activeChapterIndex,
-    required this.durationLabelForChapter,
-    required this.onChapterSelected,
     required this.onOpenBook,
+    required this.onRenameBook,
     required this.onDeleteBook,
   });
 
   final PizzaBook book;
   final List<LibraryBook> libraryBooks;
-  final int activeChapterIndex;
-  final String Function(int index) durationLabelForChapter;
-  final ValueChanged<int> onChapterSelected;
   final ValueChanged<LibraryBook> onOpenBook;
+  final ValueChanged<LibraryBook> onRenameBook;
   final ValueChanged<LibraryBook> onDeleteBook;
 
   @override
@@ -1737,6 +1855,9 @@ class _LibraryRail extends StatelessWidget {
           _ActiveBookCard(
             book: book,
             storedBook: activeStoredBook,
+            onRename: activeStoredBook == null
+                ? null
+                : () => onRenameBook(activeStoredBook!),
             onDelete: activeStoredBook == null
                 ? null
                 : () => onDeleteBook(activeStoredBook!),
@@ -1772,25 +1893,13 @@ class _LibraryRail extends StatelessWidget {
                             book: otherBooks[i],
                             active: false,
                             onOpen: () => onOpenBook(otherBooks[i]),
+                            onRename: () => onRenameBook(otherBooks[i]),
                             onDelete: () => onDeleteBook(otherBooks[i]),
                           ),
                         ),
                     ],
                   ),
           ),
-          const SizedBox(height: 24),
-          Text('Indice', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
-          for (var i = 0; i < book.chapters.length; i++)
-            Padding(
-              padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
-              child: _ChapterTile(
-                chapter: book.chapters[i],
-                durationLabel: durationLabelForChapter(i),
-                active: i == activeChapterIndex,
-                onTap: () => onChapterSelected(i),
-              ),
-            ),
         ],
       ),
     );
@@ -1801,11 +1910,13 @@ class _ActiveBookCard extends StatelessWidget {
   const _ActiveBookCard({
     required this.book,
     required this.storedBook,
+    required this.onRename,
     required this.onDelete,
   });
 
   final PizzaBook book;
   final LibraryBook? storedBook;
+  final VoidCallback? onRename;
   final VoidCallback? onDelete;
 
   @override
@@ -1841,6 +1952,15 @@ class _ActiveBookCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                if (stored != null && onRename != null) ...[
+                  const SizedBox(width: 6),
+                  IconButton(
+                    key: ValueKey('rename-book-${stored.id}'),
+                    onPressed: onRename,
+                    icon: const Icon(Icons.drive_file_rename_outline_rounded),
+                    tooltip: 'Rinomina libro',
+                  ),
+                ],
                 if (stored != null && onDelete != null) ...[
                   const SizedBox(width: 6),
                   IconButton(
@@ -1911,12 +2031,14 @@ class _LibraryBookCard extends StatelessWidget {
     required this.book,
     required this.active,
     required this.onOpen,
+    required this.onRename,
     required this.onDelete,
   });
 
   final LibraryBook book;
   final bool active;
   final VoidCallback onOpen;
+  final VoidCallback onRename;
   final VoidCallback onDelete;
 
   @override
@@ -1939,6 +2061,7 @@ class _LibraryBookCard extends StatelessWidget {
           child: _LibraryBookCardBody(
             book: book,
             active: active,
+            onRename: onRename,
             onDelete: onDelete,
           ),
         ),
@@ -1951,11 +2074,13 @@ class _LibraryBookCardBody extends StatelessWidget {
   const _LibraryBookCardBody({
     required this.book,
     required this.active,
+    required this.onRename,
     required this.onDelete,
   });
 
   final LibraryBook book;
   final bool active;
+  final VoidCallback onRename;
   final VoidCallback onDelete;
 
   @override
@@ -1980,6 +2105,13 @@ class _LibraryBookCardBody extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
+            IconButton(
+              key: ValueKey('rename-book-${book.id}'),
+              onPressed: onRename,
+              icon: const Icon(Icons.drive_file_rename_outline_rounded),
+              tooltip: 'Rinomina libro',
+            ),
+            const SizedBox(width: 2),
             IconButton(
               key: ValueKey('delete-book-${book.id}'),
               onPressed: onDelete,
@@ -2256,68 +2388,112 @@ class _ChapterTile extends StatelessWidget {
 
 class _NormalTextOverlay extends StatelessWidget {
   const _NormalTextOverlay({
-    required this.chapter,
+    required this.book,
+    required this.activeChapterIndex,
+    required this.durationLabelForChapter,
     required this.wordMap,
     required this.activeWordIndex,
     required this.onClose,
+    required this.onChapterSelected,
     required this.onJump,
   });
 
-  final PizzaChapter chapter;
+  final PizzaBook book;
+  final int activeChapterIndex;
+  final String Function(int index) durationLabelForChapter;
   final WordMap wordMap;
   final int activeWordIndex;
   final VoidCallback onClose;
+  final ValueChanged<int> onChapterSelected;
   final ValueChanged<int> onJump;
 
   @override
   Widget build(BuildContext context) {
-    final lines = _textLines(chapter.text, wordMap);
-    return ColoredBox(
-      color: PizzaColors.paper.withValues(alpha: 0.96),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+    final chapter = book.chapters[activeChapterIndex];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 760;
+        final chapterSelector = _BookChapterSelector(
+          book: book,
+          activeChapterIndex: activeChapterIndex,
+          durationLabelForChapter: durationLabelForChapter,
+          onChapterSelected: onChapterSelected,
+        );
+        Widget body = chapterSelector;
+        if (_bookTextLineSelectorEnabled) {
+          final lines = _textLines(chapter.text, wordMap);
+          final textList = _BookTextLineList(
+            lines: lines,
+            activeWordIndex: activeWordIndex,
+            onJump: onJump,
+          );
+          body = wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(width: 286, child: chapterSelector),
+                    const VerticalDivider(width: 28),
+                    Expanded(child: textList),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 142, child: chapterSelector),
+                    const SizedBox(height: 14),
+                    Expanded(child: textList),
+                  ],
+                );
+        }
+
+        return ColoredBox(
+          color: PizzaColors.paper.withValues(alpha: 0.96),
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.all(wide ? 22 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(
-                      chapter.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              book.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              chapter.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: PizzaColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Chiudi libro',
+                        child: IconButton(
+                          onPressed: onClose,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ),
+                    ],
                   ),
-                  Tooltip(
-                    message: 'Chiudi testo',
-                    child: IconButton(
-                      onPressed: onClose,
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ),
+                  const SizedBox(height: 14),
+                  Expanded(child: body),
                 ],
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: lines.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final line = lines[index];
-                    return _TextJumpLine(
-                      line: line,
-                      active:
-                          activeWordIndex >= line.firstWordIndex &&
-                          activeWordIndex <= line.lastWordIndex,
-                      onTap: () => onJump(line.startOffset),
-                    );
-                  },
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -2351,6 +2527,89 @@ class _NormalTextOverlay extends StatelessWidget {
       );
     }
     return lines;
+  }
+}
+
+// Parked for the next pass on sentence/line selection inside the book panel.
+bool get _bookTextLineSelectorEnabled => false;
+
+class _BookChapterSelector extends StatelessWidget {
+  const _BookChapterSelector({
+    required this.book,
+    required this.activeChapterIndex,
+    required this.durationLabelForChapter,
+    required this.onChapterSelected,
+  });
+
+  final PizzaBook book;
+  final int activeChapterIndex;
+  final String Function(int index) durationLabelForChapter;
+  final ValueChanged<int> onChapterSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = ListView.separated(
+      itemCount: book.chapters.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        return _ChapterTile(
+          chapter: book.chapters[index],
+          durationLabel: durationLabelForChapter(index),
+          active: index == activeChapterIndex,
+          onTap: () => onChapterSelected(index),
+        );
+      },
+    );
+
+    return Column(
+      key: const ValueKey('book-chapter-selector'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Capitoli', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        Expanded(child: list),
+      ],
+    );
+  }
+}
+
+class _BookTextLineList extends StatelessWidget {
+  const _BookTextLineList({
+    required this.lines,
+    required this.activeWordIndex,
+    required this.onJump,
+  });
+
+  final List<_TextLine> lines;
+  final int activeWordIndex;
+  final ValueChanged<int> onJump;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('book-text-lines'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Testo', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.separated(
+            itemCount: lines.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final line = lines[index];
+              return _TextJumpLine(
+                line: line,
+                active:
+                    activeWordIndex >= line.firstWordIndex &&
+                    activeWordIndex <= line.lastWordIndex,
+                onTap: () => onJump(line.startOffset),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -2395,14 +2654,12 @@ class _MobileHeader extends StatelessWidget {
     required this.importBusy,
     required this.importError,
     required this.onOpenWorkspace,
-    required this.onImport,
   });
 
   final PizzaBook book;
   final bool importBusy;
   final String? importError;
   final VoidCallback onOpenWorkspace;
-  final VoidCallback onImport;
 
   @override
   Widget build(BuildContext context) {
@@ -2451,13 +2708,6 @@ class _MobileHeader extends StatelessWidget {
               icon: const Icon(Icons.account_circle_rounded),
               tooltip: 'Account e libreria',
             ),
-            IconButton(
-              onPressed: importBusy ? null : onImport,
-              icon: importBusy
-                  ? const _SmallBusyIndicator()
-                  : const Icon(Icons.upload_file_rounded),
-              tooltip: 'Importa ebook',
-            ),
           ],
         ),
       ),
@@ -2485,7 +2735,11 @@ class _MobileControls extends StatelessWidget {
                 children: [
                   Expanded(child: _CompactModeSelector(state: state)),
                   const SizedBox(width: 10),
-                  _WpmReadout(value: state._wpm.round()),
+                  _SpeedReadoutToggle(
+                    value: state._speedReadoutValue(),
+                    onTap: state._toggleSpeedReadout,
+                    compact: true,
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -2540,41 +2794,93 @@ class _CompactModeSelector extends StatelessWidget {
   }
 }
 
-class _WpmReadout extends StatelessWidget {
-  const _WpmReadout({required this.value});
+class _SpeedReadoutValue {
+  const _SpeedReadoutValue({
+    required this.primary,
+    required this.secondary,
+    required this.inline,
+    required this.tooltip,
+  });
 
-  final int value;
+  final String primary;
+  final String secondary;
+  final String inline;
+  final String tooltip;
+}
+
+class _SpeedReadoutToggle extends StatelessWidget {
+  const _SpeedReadoutToggle({
+    required this.value,
+    required this.onTap,
+    required this.compact,
+  });
+
+  final _SpeedReadoutValue value;
+  final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: PizzaColors.dough,
-        border: Border.all(color: PizzaColors.line),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: SizedBox(
-        width: 82,
-        height: 42,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '$value',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: PizzaColors.tomatoDeep,
-                height: 1,
-              ),
+    final borderRadius = BorderRadius.circular(8);
+    return Tooltip(
+      message: value.tooltip,
+      child: Semantics(
+        button: true,
+        label: value.inline,
+        child: Material(
+          color: PizzaColors.dough,
+          shape: RoundedRectangleBorder(
+            borderRadius: borderRadius,
+            side: const BorderSide(color: PizzaColors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const ValueKey('speed-readout-toggle'),
+            onTap: onTap,
+            child: SizedBox(
+              width: compact ? 92 : 104,
+              height: compact ? 42 : 34,
+              child: compact
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            value.primary,
+                            maxLines: 1,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: PizzaColors.tomatoDeep,
+                                  height: 1,
+                                ),
+                          ),
+                        ),
+                        Text(
+                          value.secondary,
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: PizzaColors.muted,
+                                fontSize: 11,
+                                height: 1,
+                              ),
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          value.inline,
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: PizzaColors.tomatoDeep),
+                        ),
+                      ),
+                    ),
             ),
-            Text(
-              'WPM',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: PizzaColors.muted,
-                fontSize: 11,
-                height: 1,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
