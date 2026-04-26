@@ -690,7 +690,7 @@ class _ReaderTopBar extends StatelessWidget {
           message: 'Apri testo normale',
           child: IconButton.filledTonal(
             onPressed: onOpenText,
-            icon: const Icon(Icons.subject_rounded),
+            icon: const Icon(Icons.menu_book_rounded),
           ),
         ),
       ],
@@ -1415,7 +1415,7 @@ class _MobileWorkspaceSheet extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.menu_book_rounded,
+                Icons.account_circle_rounded,
                 color: PizzaColors.blueCheese,
                 size: 30,
               ),
@@ -2223,7 +2223,7 @@ class _MobileHeader extends StatelessWidget {
             ),
             IconButton(
               onPressed: onOpenWorkspace,
-              icon: const Icon(Icons.menu_book_rounded),
+              icon: const Icon(Icons.account_circle_rounded),
               tooltip: 'Account e libreria',
             ),
             IconButton(

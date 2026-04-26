@@ -66,11 +66,18 @@ void main() {
     expect(
       find.descendant(
         of: find.byTooltip('Account e libreria'),
-        matching: find.byIcon(Icons.menu_book_rounded),
+        matching: find.byIcon(Icons.account_circle_rounded),
       ),
       findsOneWidget,
     );
     expect(find.byTooltip('Importa ebook'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byTooltip('Apri testo normale'),
+        matching: find.byIcon(Icons.menu_book_rounded),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('360'), findsOneWidget);
     expect(find.text('WPM'), findsOneWidget);
     expect(find.text('Modalita'), findsNothing);
