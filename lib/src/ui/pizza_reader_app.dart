@@ -2212,7 +2212,9 @@ PizzaBook _demoBook() {
         text:
             'La lettura mostra una parola alla volta, con il centro ottico '
             'in evidenza. La velocita media resta vicina al WPM scelto, '
-            'ma punteggiatura e parole lunghe ricevono piu respiro.',
+            'ma punteggiatura e parole lunghe ricevono piu respiro. '
+            'Precipitevolissimevolmente, internazionalizzazione ed '
+            'elettroencefalograficamente servono a testare il layout.',
       ),
       PizzaChapter(
         id: 'chapter-3',
