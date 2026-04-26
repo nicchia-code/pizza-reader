@@ -41,6 +41,101 @@ class PizzaReaderApp extends StatelessWidget {
   }
 }
 
+class PizzaReaderLoadingApp extends StatelessWidget {
+  const PizzaReaderLoadingApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Pizza Reader',
+      theme: buildPizzaTheme(),
+      home: const _PizzaLoadingScreen(),
+    );
+  }
+}
+
+class PizzaReaderStartupErrorApp extends StatelessWidget {
+  const PizzaReaderStartupErrorApp({super.key, required this.error});
+
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Pizza Reader',
+      theme: buildPizzaTheme(),
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: PizzaColors.tomatoDeep,
+                    size: 42,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Avvio non riuscito',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$error',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: PizzaColors.muted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PizzaLoadingScreen extends StatelessWidget {
+  const _PizzaLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: ColoredBox(
+        color: PizzaColors.paper,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/brand/pizzalogo.png', width: 96, height: 96),
+              const SizedBox(height: 22),
+              Text(
+                'Pizza Reader',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 18),
+              const SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class PizzaReaderHome extends StatefulWidget {
   const PizzaReaderHome({
     super.key,
@@ -423,7 +518,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     final wide = MediaQuery.sizeOf(context).width >= 1100;
     return Scaffold(
       body: CustomPaint(
-        painter: const _PizzaBackgroundPainter(),
+        painter: const _ReaderBackgroundPainter(),
         child: SafeArea(
           child: wide ? _buildWideLayout(context) : _buildNarrowLayout(context),
         ),
@@ -459,6 +554,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
           book: _book,
           importBusy: _importBusy,
           importError: _importError,
+          onOpenWorkspace: _openMobileWorkspace,
           onImport: _importBook,
         ),
         const Divider(height: 1),
@@ -466,6 +562,21 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
         const Divider(height: 1),
         _MobileControls(state: this),
       ],
+    );
+  }
+
+  void _openMobileWorkspace() {
+    _stopTimedReading();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: PizzaColors.paper,
+      constraints: const BoxConstraints(maxWidth: 680),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) => _MobileWorkspaceSheet(state: this),
     );
   }
 }
@@ -1079,10 +1190,21 @@ class _ImportPanel extends StatelessWidget {
           children: [
             Row(
               children: [
-                Image.asset(
-                  'assets/brand/pizzalogo.png',
-                  width: 44,
-                  height: 44,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: PizzaColors.blueCheese.withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: PizzaColors.blueCheese.withValues(alpha: 0.22),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const SizedBox.square(
+                    dimension: 44,
+                    child: Icon(
+                      Icons.upload_file_rounded,
+                      color: PizzaColors.blueCheese,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1247,6 +1369,147 @@ class _ChapterPanel extends StatelessWidget {
   }
 }
 
+class _MobileWorkspaceSheet extends StatelessWidget {
+  const _MobileWorkspaceSheet({required this.state});
+
+  final _PizzaReaderHomeState state;
+
+  @override
+  Widget build(BuildContext context) {
+    LibraryBook? activeStoredBook;
+    for (final stored in state._libraryBooks) {
+      if (stored.id == state._book.id) {
+        activeStoredBook = stored;
+        break;
+      }
+    }
+
+    final bottomPadding = MediaQuery.paddingOf(context).bottom + 18;
+    return FractionallySizedBox(
+      heightFactor: 0.9,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding),
+        children: [
+          Center(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: PizzaColors.line,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const SizedBox(width: 42, height: 4),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.dashboard_customize_rounded,
+                color: PizzaColors.blueCheese,
+                size: 30,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Account e libreria',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Chiudi',
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _AuthPanel(state: state),
+          const SizedBox(height: 18),
+          _ImportPanel(
+            busy: state._importBusy,
+            error: state._importError,
+            cloudEnabled: state.widget.cloudEnabled,
+            onPressed: () {
+              Navigator.of(context).pop();
+              state._importBook();
+            },
+          ),
+          const SizedBox(height: 22),
+          _MobileLibrarySection(
+            book: state._book,
+            storedBook: activeStoredBook,
+            libraryBooks: state._libraryBooks,
+          ),
+          const SizedBox(height: 22),
+          _ChapterPanel(
+            book: state._book,
+            activeChapterIndex: state._reader.position.chapterIndex,
+            wordCountForChapter: state._wordCountForChapter,
+            onChapterSelected: (index) {
+              Navigator.of(context).pop();
+              state._selectChapter(index);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileLibrarySection extends StatelessWidget {
+  const _MobileLibrarySection({
+    required this.book,
+    required this.storedBook,
+    required this.libraryBooks,
+  });
+
+  final PizzaBook book;
+  final LibraryBook? storedBook;
+  final List<LibraryBook> libraryBooks;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Libreria',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            _CountBadge(count: libraryBooks.length),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _ActiveBookCard(book: book, storedBook: storedBook),
+        const SizedBox(height: 12),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: libraryBooks.isEmpty
+              ? const _LibraryEmptyState(key: ValueKey('mobile-empty-library'))
+              : Column(
+                  key: ValueKey(
+                    'mobile-library-${libraryBooks.length}-${book.id}',
+                  ),
+                  children: [
+                    for (var i = 0; i < libraryBooks.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+                        child: _LibraryBookCard(
+                          book: libraryBooks[i],
+                          active: libraryBooks[i].id == book.id,
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PanelShell extends StatelessWidget {
   const _PanelShell({
     required this.title,
@@ -1327,7 +1590,21 @@ class _LibraryRail extends StatelessWidget {
         children: [
           Row(
             children: [
-              Image.asset('assets/brand/pizzalogo.png', width: 52, height: 52),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: PizzaColors.paperAlt,
+                  border: Border.all(color: PizzaColors.line),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const SizedBox.square(
+                  dimension: 52,
+                  child: Icon(
+                    Icons.auto_stories_rounded,
+                    color: PizzaColors.blueCheese,
+                    size: 30,
+                  ),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -1419,7 +1696,7 @@ class _ActiveBookCard extends StatelessWidget {
             Row(
               children: [
                 const Icon(
-                  Icons.local_pizza_rounded,
+                  Icons.play_circle_fill_rounded,
                   color: PizzaColors.tomato,
                   size: 20,
                 ),
@@ -1496,7 +1773,9 @@ class _LibraryBookCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  active ? Icons.local_pizza_rounded : Icons.menu_book_rounded,
+                  active
+                      ? Icons.play_circle_fill_rounded
+                      : Icons.menu_book_rounded,
                   color: active ? PizzaColors.tomato : PizzaColors.basil,
                   size: 20,
                 ),
@@ -1704,7 +1983,7 @@ class _ChapterTile extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                active ? Icons.local_pizza_rounded : Icons.menu_book_rounded,
+                active ? Icons.bookmark_rounded : Icons.menu_book_rounded,
                 color: active ? PizzaColors.tomato : PizzaColors.basil,
                 size: 20,
               ),
@@ -1874,12 +2153,14 @@ class _MobileHeader extends StatelessWidget {
     required this.book,
     required this.importBusy,
     required this.importError,
+    required this.onOpenWorkspace,
     required this.onImport,
   });
 
   final PizzaBook book;
   final bool importBusy;
   final String? importError;
+  final VoidCallback onOpenWorkspace;
   final VoidCallback onImport;
 
   @override
@@ -1895,7 +2176,11 @@ class _MobileHeader extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Row(
           children: [
-            Image.asset('assets/brand/pizzalogo.png', width: 40, height: 40),
+            const Icon(
+              Icons.auto_stories_rounded,
+              color: PizzaColors.blueCheese,
+              size: 32,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -1923,6 +2208,11 @@ class _MobileHeader extends StatelessWidget {
                   ],
                 ],
               ),
+            ),
+            IconButton(
+              onPressed: onOpenWorkspace,
+              icon: const Icon(Icons.account_circle_rounded),
+              tooltip: 'Account e libreria',
             ),
             IconButton(
               onPressed: importBusy ? null : onImport,
@@ -2054,31 +2344,33 @@ class _WpmReadout extends StatelessWidget {
   }
 }
 
-class _PizzaBackgroundPainter extends CustomPainter {
-  const _PizzaBackgroundPainter();
+class _ReaderBackgroundPainter extends CustomPainter {
+  const _ReaderBackgroundPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     final base = Paint()..color = PizzaColors.dough;
     canvas.drawRect(Offset.zero & size, base);
 
-    final sauce = Paint()
-      ..color = PizzaColors.tomato.withValues(alpha: 0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 18;
-    final crust = Paint()
-      ..color = PizzaColors.crust.withValues(alpha: 0.18)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+    final guide = Paint()
+      ..color = PizzaColors.crust.withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    final accent = Paint()
+      ..color = PizzaColors.tomato.withValues(alpha: 0.035)
+      ..style = PaintingStyle.fill;
 
-    final center = Offset(size.width * 0.58, size.height * 0.48);
-    final radius = math.max(size.width, size.height) * 0.42;
-    canvas.drawCircle(center, radius, sauce);
-    for (var i = 0; i < 10; i++) {
-      final angle = i * math.pi / 5;
-      final end = center + Offset(math.cos(angle), math.sin(angle)) * radius;
-      canvas.drawLine(center, end, crust);
+    final bandHeight = math.max(76.0, size.height * 0.11);
+    for (var y = bandHeight; y < size.height; y += bandHeight) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), guide);
     }
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.58, 0, size.width * 0.42, size.height),
+        const Radius.circular(0),
+      ),
+      accent,
+    );
   }
 
   @override

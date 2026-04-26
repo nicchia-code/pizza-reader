@@ -1,6 +1,7 @@
-import 'dart:ui';
+import 'dart:ui' show Size;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart' show Image;
 import 'package:pizza_reader/src/supabase/supabase.dart';
 import 'package:pizza_reader/src/ui/pizza_reader_app.dart';
 
@@ -56,10 +57,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Demo Pizza Book'), findsWidgets);
+    expect(find.byTooltip('Account e libreria'), findsOneWidget);
     expect(find.byTooltip('Importa ebook'), findsOneWidget);
     expect(find.text('360'), findsOneWidget);
     expect(find.text('WPM'), findsOneWidget);
     expect(find.text('Modalita'), findsNothing);
+
+    await tester.tap(find.byTooltip('Account e libreria'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Accesso'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Code'), findsOneWidget);
+    expect(find.text('Libreria'), findsOneWidget);
+    expect(find.text('Nessun libro importato'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the pizza logo only on the loading screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const PizzaReaderLoadingApp());
+    await tester.pump();
+
+    expect(find.byType(Image), findsOneWidget);
+
+    await tester.pumpWidget(PizzaReaderApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Image), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
