@@ -7,7 +7,7 @@ pivot letter and adjustable WPM.
 ## Current Scope
 
 - Flutter web + Android scaffold.
-- Client-side import for `epub`, `fb2`, `txt`, `md`, and `html`.
+- Client-side import for `pizzabook`, `epub`, `fb2`, `txt`, `md`, and `html`.
 - Reader modes: `auto`, `hold`, `manual`.
 - Weighted pacing: punctuation and long words get more time while preserving
   the target average WPM.
@@ -61,5 +61,5 @@ More details are in `docs/supabase.md`.
 ## Notes
 
 MOBI/AZW import is intentionally unsupported in the current client-only MVP.
-The importer returns a clear `UnsupportedError` and asks for EPUB, FB2, TXT,
-Markdown, or HTML.
+The importer returns a clear `UnsupportedError` and asks for PIZZABOOK, EPUB,
+FB2, TXT, Markdown, or HTML.

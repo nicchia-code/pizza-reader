@@ -7,8 +7,23 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:xml/xml.dart' as xml;
 
 import '../core/pizza_book.dart';
+import '../core/pizza_book_codec.dart';
 
-enum PizzaImportKind { text, markdown, html, epub, fb2, mobi, azw }
+const pizzaImportPickerExtensions = <String>[
+  'pizzabook',
+  'epub',
+  'txt',
+  'md',
+  'markdown',
+  'html',
+  'htm',
+  'fb2',
+  'mobi',
+  'azw',
+  'azw3',
+];
+
+enum PizzaImportKind { pizzaBook, text, markdown, html, epub, fb2, mobi, azw }
 
 class PizzaImporter {
   const PizzaImporter();
@@ -21,6 +36,8 @@ class PizzaImporter {
   }) {
     final resolvedKind = kind ?? _kindFromFileName(fileName);
     switch (resolvedKind) {
+      case PizzaImportKind.pizzaBook:
+        return const PizzaBookCodec().decodeBytes(bytes);
       case PizzaImportKind.text:
         return _bookFromSingleText(
           utf8.decode(bytes, allowMalformed: false),
@@ -267,6 +284,9 @@ class _BookMetadata {
 
 PizzaImportKind _kindFromFileName(String fileName) {
   final lower = fileName.toLowerCase();
+  if (lower.endsWith('.pizzabook')) {
+    return PizzaImportKind.pizzaBook;
+  }
   if (lower.endsWith('.txt')) {
     return PizzaImportKind.text;
   }

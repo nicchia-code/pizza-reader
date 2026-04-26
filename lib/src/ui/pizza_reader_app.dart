@@ -275,18 +275,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
         allowMultiple: false,
         withData: true,
         type: FileType.custom,
-        allowedExtensions: const [
-          'epub',
-          'txt',
-          'md',
-          'markdown',
-          'html',
-          'htm',
-          'fb2',
-          'mobi',
-          'azw',
-          'azw3',
-        ],
+        allowedExtensions: pizzaImportPickerExtensions,
       );
 
       final file = result?.files.single;

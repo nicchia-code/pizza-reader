@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pizza_reader/src/core/pizza_book.dart';
+import 'package:pizza_reader/src/core/pizza_book_codec.dart';
 import 'package:pizza_reader/src/importing/pizza_importer.dart';
 
 void main() {
@@ -56,6 +58,41 @@ void main() {
       expect(book.chapters[1].text, contains('Second pizza chapter.'));
     });
 
+    test('imports baked PIZZABOOK documents with codec validation', () {
+      const importer = PizzaImporter();
+      const codec = PizzaBookCodec();
+      final sourceBook = _samplePizzaBook();
+
+      final book = importer.importBytes(
+        codec.encode(sourceBook),
+        fileName: 'sample.pizzabook',
+      );
+
+      expect(pizzaImportPickerExtensions, contains('pizzabook'));
+      expect(book.id, sourceBook.id);
+      expect(book.title, sourceBook.title);
+      expect(book.author, sourceBook.author);
+      expect(book.language, sourceBook.language);
+      expect(book.chapters.single.text, sourceBook.chapters.single.text);
+      expect(book.metadata['prepared_by'], 'pizza-baker');
+    });
+
+    test('rejects tampered PIZZABOOK documents', () {
+      const importer = PizzaImporter();
+      const codec = PizzaBookCodec();
+      final encoded = codec
+          .encodeToString(_samplePizzaBook())
+          .replaceFirst('Baked pizza text.', 'Changed pizza text.');
+
+      expect(
+        () => importer.importBytes(
+          utf8.encode(encoded),
+          fileName: 'tampered.pizzabook',
+        ),
+        throwsFormatException,
+      );
+    });
+
     test('imports FB2 metadata and readable sections', () {
       const importer = PizzaImporter();
       final book = importer.importBytes(_sampleFb2(), fileName: 'sample.fb2');
@@ -92,6 +129,27 @@ void main() {
       );
     });
   });
+}
+
+PizzaBook _samplePizzaBook() {
+  return PizzaBook(
+    id: 'baked-book',
+    title: 'Baked Book',
+    author: 'Pizza Baker',
+    language: 'en',
+    chapters: const <PizzaChapter>[
+      PizzaChapter(
+        id: 'chapter-1',
+        title: 'Chapter 1',
+        text: 'Baked pizza text.',
+      ),
+    ],
+    metadata: const <String, Object?>{
+      'source_file': 'sample.epub',
+      'source_kind': 'pizzabook',
+      'prepared_by': 'pizza-baker',
+    },
+  );
 }
 
 Uint8List _minimalEpub() {
