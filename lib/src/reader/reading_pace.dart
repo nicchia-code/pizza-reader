@@ -50,7 +50,13 @@ class ReadingPace {
     var weight = 1.0;
 
     if (length > 6) {
-      weight += math.min(0.7, (length - 6) * 0.07);
+      weight += math.min(1.2, (length - 6) * 0.08);
+    }
+    if (length > 14) {
+      weight += math.min(0.9, (length - 14) * 0.08);
+    }
+    if (length > 22) {
+      weight += math.min(0.5, (length - 22) * 0.08);
     }
 
     final text = word.text.trimRight();
@@ -64,7 +70,7 @@ class ReadingPace {
       weight += 0.1;
     }
 
-    return math.min(2.6, weight);
+    return math.min(4.2, weight);
   }
 
   int _boundedMicros(

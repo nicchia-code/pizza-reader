@@ -23,5 +23,27 @@ void main() {
         expect(totalMicros, Duration.microsecondsPerSecond * 3 ~/ 2);
       },
     );
+
+    test('gives very long words noticeably more breathing room', () {
+      const tokenizer = WordTokenizer();
+      const pace = ReadingPace(wordsPerMinute: 360);
+      final words = tokenizer
+          .tokenize('una cosa precipitevolissimevolmente cade piano adesso')
+          .words;
+
+      final durations = pace.durationsFor(words);
+      final totalMicros = durations.fold<int>(
+        0,
+        (total, duration) => total + duration.inMicroseconds,
+      );
+      final shortWordDuration = durations.first;
+      final longWordDuration = durations[2];
+
+      expect(
+        longWordDuration.inMicroseconds,
+        greaterThanOrEqualTo(shortWordDuration.inMicroseconds * 3),
+      );
+      expect(totalMicros, Duration.microsecondsPerMinute * words.length ~/ 360);
+    });
   });
 }
