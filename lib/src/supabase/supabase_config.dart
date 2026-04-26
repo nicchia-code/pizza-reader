@@ -14,14 +14,17 @@ class SupabaseConfig {
 
   static const urlDefine = 'SUPABASE_URL';
   static const anonKeyDefine = 'SUPABASE_ANON_KEY';
+  static const publishableKeyDefine = 'SUPABASE_PUBLISHABLE_KEY';
 
   final String url;
   final String anonKey;
 
   factory SupabaseConfig.fromDartDefines() {
+    const anonKey = String.fromEnvironment(anonKeyDefine);
+    const publishableKey = String.fromEnvironment(publishableKeyDefine);
     return SupabaseConfig.fromValues(
       url: const String.fromEnvironment(urlDefine),
-      anonKey: const String.fromEnvironment(anonKeyDefine),
+      anonKey: anonKey.isNotEmpty ? anonKey : publishableKey,
     );
   }
 
@@ -34,7 +37,7 @@ class SupabaseConfig {
 
     if (normalizedAnonKey.isEmpty) {
       throw const SupabaseConfigException(
-        'Missing SUPABASE_ANON_KEY. Pass it with --dart-define.',
+        'Missing SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY. Pass one with --dart-define.',
       );
     }
 

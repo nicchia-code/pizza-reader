@@ -36,5 +36,10 @@ void main() {
         throwsA(isA<SupabaseConfigException>()),
       );
     });
+
+    test('documents publishable key dart define alias', () {
+      expect(SupabaseConfig.publishableKeyDefine, 'SUPABASE_PUBLISHABLE_KEY');
+      expect(SupabaseConfig.anonKeyDefine, 'SUPABASE_ANON_KEY');
+    });
   });
 }

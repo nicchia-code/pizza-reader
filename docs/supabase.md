@@ -5,8 +5,11 @@ PizzaReader expects a Supabase project configured through Dart defines:
 ```sh
 flutter run \
   --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
+
+`SUPABASE_ANON_KEY` is also accepted for older projects that still use anon key
+terminology.
 
 For tests, use the fake repositories in `lib/src/supabase` and do not pass real
 credentials.

@@ -1,3 +1,6 @@
+drop table if exists public.reading_progress cascade;
+drop table if exists public.books cascade;
+
 insert into storage.buckets (
   id,
   name,
