@@ -12,15 +12,31 @@ void main() {
 
       final encoded = codec.encodeToString(book);
       final document = jsonDecode(encoded) as Map<String, Object?>;
+      final encodedBytes = codec.encode(book);
 
       expect(document['format'], PizzaBookCodec.format);
       expect(document['version'], PizzaBookCodec.version);
       expect(document['content_hash'], codec.contentHash(book));
+      expect(pizzaBookBytesAreGzip(encodedBytes), isTrue);
 
       final decoded = codec.decodeString(encoded);
       expect(decoded.id, book.id);
       expect(decoded.title, book.title);
       expect(decoded.chapters.single.text, book.chapters.single.text);
+
+      final decodedBytes = codec.decodeBytes(encodedBytes);
+      expect(decodedBytes.id, book.id);
+      expect(decodedBytes.title, book.title);
+      expect(decodedBytes.chapters.single.text, book.chapters.single.text);
+    });
+
+    test('decodes legacy uncompressed reader JSON bytes', () {
+      const codec = PizzaBookCodec();
+      final book = _sampleBook();
+      final legacyBytes = utf8.encode(codec.encodeToString(book));
+
+      expect(pizzaBookBytesAreGzip(legacyBytes), isFalse);
+      expect(codec.decodeBytes(legacyBytes).title, book.title);
     });
 
     test('hash is deterministic for equivalent JSON content', () {

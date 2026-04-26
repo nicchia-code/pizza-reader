@@ -167,6 +167,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
   var _wpm = 200.0;
   var _isPlaying = false;
   var _textMapOpen = false;
+  var _textLineSelectionOpen = false;
   var _importBusy = false;
   var _authBusy = false;
   var _codeSent = false;
@@ -215,6 +216,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
       _reader = _newReaderFor(book, initialMode: _mode);
       _isPlaying = false;
       _textMapOpen = false;
+      _textLineSelectionOpen = false;
       _status = '${book.title} pronto';
     });
   }
@@ -687,7 +689,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     _stopTimedReading();
     setState(() {
       _reader.seekChapter(index);
-      _textMapOpen = false;
+      _textMapOpen = _textLineSelectionOpen;
       _status = '${_book.chapters[index].title} selezionato';
     });
   }
@@ -697,16 +699,32 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
     setState(() {
       _reader.seekTextOffset(offset);
       _textMapOpen = false;
+      _textLineSelectionOpen = false;
       _status = 'Jump alla parola ${_reader.position.wordIndex + 1}';
     });
   }
 
   void _toggleTextMap() {
-    setState(() => _textMapOpen = !_textMapOpen);
+    setState(() {
+      _textLineSelectionOpen = false;
+      _textMapOpen = !_textMapOpen;
+    });
+  }
+
+  void _openTextLineSelection() {
+    _stopTimedReading();
+    setState(() {
+      _textLineSelectionOpen = true;
+      _textMapOpen = true;
+      _status = 'Seleziona una frase';
+    });
   }
 
   void _closeTextMap() {
-    setState(() => _textMapOpen = false);
+    setState(() {
+      _textMapOpen = false;
+      _textLineSelectionOpen = false;
+    });
   }
 
   WordMap _wordMapForChapter(int chapterIndex) {
@@ -852,6 +870,7 @@ class _ReaderStage extends StatelessWidget {
               durationLabelForChapter: state._durationLabelForChapter,
               wordMap: wordMap,
               activeWordIndex: state._reader.position.wordIndex,
+              showTextLines: state._textLineSelectionOpen,
               onClose: state._closeTextMap,
               onChapterSelected: state._selectChapterInBook,
               onJump: state._jumpToOffset,
@@ -1017,10 +1036,10 @@ class _ReaderTransport extends StatelessWidget {
         ),
         _PrimaryReaderButton(state: state),
         Tooltip(
-          message: 'Parola successiva',
+          message: 'Mostra frasi',
           child: IconButton.outlined(
-            onPressed: state._nextWord,
-            icon: const Icon(Icons.skip_next_rounded),
+            onPressed: state._openTextLineSelection,
+            icon: const Icon(Icons.format_align_left_rounded),
           ),
         ),
       ],
@@ -2408,6 +2427,7 @@ class _NormalTextOverlay extends StatelessWidget {
     required this.durationLabelForChapter,
     required this.wordMap,
     required this.activeWordIndex,
+    required this.showTextLines,
     required this.onClose,
     required this.onChapterSelected,
     required this.onJump,
@@ -2418,6 +2438,7 @@ class _NormalTextOverlay extends StatelessWidget {
   final String Function(int index) durationLabelForChapter;
   final WordMap wordMap;
   final int activeWordIndex;
+  final bool showTextLines;
   final VoidCallback onClose;
   final ValueChanged<int> onChapterSelected;
   final ValueChanged<int> onJump;
@@ -2435,30 +2456,13 @@ class _NormalTextOverlay extends StatelessWidget {
           onChapterSelected: onChapterSelected,
         );
         Widget body = chapterSelector;
-        if (_bookTextLineSelectorEnabled) {
+        if (showTextLines) {
           final lines = _textLines(chapter.text, wordMap);
-          final textList = _BookTextLineList(
+          body = _BookTextLineList(
             lines: lines,
             activeWordIndex: activeWordIndex,
             onJump: onJump,
           );
-          body = wide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: 286, child: chapterSelector),
-                    const VerticalDivider(width: 28),
-                    Expanded(child: textList),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: 142, child: chapterSelector),
-                    const SizedBox(height: 14),
-                    Expanded(child: textList),
-                  ],
-                );
         }
 
         return ColoredBox(
@@ -2544,9 +2548,6 @@ class _NormalTextOverlay extends StatelessWidget {
     return lines;
   }
 }
-
-// Parked for the next pass on sentence/line selection inside the book panel.
-bool get _bookTextLineSelectorEnabled => false;
 
 class _BookChapterSelector extends StatelessWidget {
   const _BookChapterSelector({

@@ -160,6 +160,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('opens the sentence selector from the transport', (tester) async {
+    _setViewport(tester, const Size(1400, 900));
+
+    await tester.pumpWidget(PizzaReaderApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Parola successiva'), findsNothing);
+    await tester.tap(find.byTooltip('Mostra frasi'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('book-chapter-selector')), findsNothing);
+    expect(find.byKey(const ValueKey('book-text-lines')), findsOneWidget);
+    expect(find.text('Capitoli'), findsNothing);
+    expect(find.text('Testo'), findsOneWidget);
+    expect(find.textContaining('Ogni libro entra'), findsOneWidget);
+    expect(find.text('Cottura'), findsNothing);
+
+    final longSentence = find.textContaining('Precipitevolissimevolmente');
+    expect(longSentence, findsNothing);
+
+    await tester.tap(find.textContaining('Ogni libro entra'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('book-text-lines')), findsNothing);
+    expect(find.textContaining('Jump alla parola'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renames imported books from the library profile', (
     tester,
   ) async {
@@ -280,6 +308,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.byTooltip('Mostra frasi'), findsOneWidget);
     expect(find.text('200'), findsOneWidget);
     expect(find.text('WPM'), findsOneWidget);
     expect(find.text('Modalita'), findsNothing);

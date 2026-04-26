@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 
 import 'pizza_book.dart';
@@ -13,7 +14,7 @@ class PizzaBookCodec {
   static const String hashPrefix = 'sha256:';
 
   Uint8List encode(PizzaBook book) {
-    return Uint8List.fromList(utf8.encode(encodeToString(book)));
+    return GZipEncoder().encodeBytes(utf8.encode(encodeToString(book)));
   }
 
   String encodeToString(PizzaBook book) {
@@ -22,7 +23,10 @@ class PizzaBookCodec {
   }
 
   PizzaBook decodeBytes(List<int> bytes) {
-    final source = utf8.decode(bytes, allowMalformed: false);
+    final payload = pizzaBookBytesAreGzip(bytes)
+        ? GZipDecoder().decodeBytes(bytes, verify: true)
+        : bytes;
+    final source = utf8.decode(payload, allowMalformed: false);
     return decodeString(source);
   }
 
@@ -93,6 +97,10 @@ class PizzaBookCodec {
     'content_hash': contentHash(book),
     'book': book.toJson(),
   };
+}
+
+bool pizzaBookBytesAreGzip(List<int> bytes) {
+  return bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
 }
 
 String _canonicalJsonEncode(Object? value) {

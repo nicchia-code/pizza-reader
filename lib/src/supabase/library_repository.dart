@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const pizzaBooksBucketId = 'pizza-books';
 const booksTableName = 'books';
 const readingProgressTableName = 'reading_progress';
-const pizzaBookContentType = 'application/json';
+const pizzaBookContentType = 'application/gzip';
 
 abstract interface class LibraryRepository {
   Future<LibraryBook> uploadBook({
