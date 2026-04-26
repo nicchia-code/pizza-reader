@@ -254,7 +254,6 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
           'html',
           'htm',
           'fb2',
-          'pb',
           'mobi',
           'azw',
           'azw3',
@@ -285,7 +284,7 @@ class _PizzaReaderHomeState extends State<PizzaReaderHome> {
       _replaceBook(book);
       await _loadLibrary();
       setState(() {
-        _status = 'Convertito e caricato ${file.name} come .pb';
+        _status = 'Importato ${file.name}';
         _importBusy = false;
         _importError = null;
       });
@@ -976,44 +975,57 @@ class _SignedOutAuthContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: state._otpController,
-                enabled: state._codeSent && !state._authBusy,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  labelText: 'Code',
-                  prefixIcon: Icon(Icons.pin_rounded, size: 18),
-                  prefixIconConstraints: BoxConstraints(minWidth: 38),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: state._otpController,
+          builder: (context, value, _) {
+            final hasCode = value.text.trim().isNotEmpty;
+            final shouldVerify = state._codeSent || hasCode;
+            return Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: state._otpController,
+                    enabled: !state._authBusy,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) {
+                      if (!state._authBusy &&
+                          state._otpController.text.trim().isNotEmpty) {
+                        state._verifyOtp();
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Code',
+                      prefixIcon: Icon(Icons.pin_rounded, size: 18),
+                      prefixIconConstraints: BoxConstraints(minWidth: 38),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: state._authBusy
-                  ? null
-                  : state._codeSent
-                  ? state._verifyOtp
-                  : state._sendMagicCode,
-              icon: state._authBusy
-                  ? const _SmallBusyIndicator()
-                  : Icon(
-                      state._codeSent
-                          ? Icons.verified_rounded
-                          : Icons.send_rounded,
-                      size: 18,
-                    ),
-              label: Text(state._codeSent ? 'Verifica' : 'Invia'),
-            ),
-          ],
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: state._authBusy
+                      ? null
+                      : shouldVerify
+                      ? state._verifyOtp
+                      : state._sendMagicCode,
+                  icon: state._authBusy
+                      ? const _SmallBusyIndicator()
+                      : Icon(
+                          shouldVerify
+                              ? Icons.verified_rounded
+                              : Icons.send_rounded,
+                          size: 18,
+                        ),
+                  label: Text(shouldVerify ? 'Verifica' : 'Invia'),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 7),
         Text(
@@ -1171,8 +1183,8 @@ class _ImportPanel extends StatelessWidget {
         (busy
             ? 'Conversione e salvataggio in corso.'
             : cloudEnabled
-            ? 'Converte in .pb e salva su Supabase.'
-            : 'Converte in .pb sul repository locale fake.');
+            ? 'Importa ebook e salva su Supabase.'
+            : 'Importa ebook nel repository locale fake.');
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
@@ -1403,7 +1415,7 @@ class _MobileWorkspaceSheet extends StatelessWidget {
           Row(
             children: [
               const Icon(
-                Icons.dashboard_customize_rounded,
+                Icons.menu_book_rounded,
                 color: PizzaColors.blueCheese,
                 size: 30,
               ),
@@ -2211,7 +2223,7 @@ class _MobileHeader extends StatelessWidget {
             ),
             IconButton(
               onPressed: onOpenWorkspace,
-              icon: const Icon(Icons.account_circle_rounded),
+              icon: const Icon(Icons.menu_book_rounded),
               tooltip: 'Account e libreria',
             ),
             IconButton(
@@ -2439,19 +2451,15 @@ String _compactDecimal(double value) {
 
 String _libraryBookFormat(LibraryBook book) {
   final source = _fileExtension(book.sourceFileName);
-  final stored = _fileExtension(book.storagePath) ?? 'PB';
-  if (source == null || source == stored) {
-    return stored;
-  }
-  return '$source/$stored';
+  return source ?? 'EBOOK';
 }
 
 String _pizzaBookFormat(PizzaBook book) {
   final sourceFile = book.metadata['source_file'];
   if (sourceFile is String) {
-    return _fileExtension(sourceFile) ?? 'PB';
+    return _fileExtension(sourceFile) ?? 'EBOOK';
   }
-  return 'PB';
+  return 'EBOOK';
 }
 
 String? _fileExtension(String? path) {
@@ -2483,12 +2491,12 @@ class _TextLine {
 PizzaBook _demoBook() {
   return PizzaBook(
     id: 'demo-pizza-book',
-    title: 'Demo Pizza Book',
+    title: 'Demo Ebook',
     author: 'Pizza Reader',
     language: 'it',
     metadata: const <String, Object?>{
       'source_kind': 'demo',
-      'source_file': 'demo.pb',
+      'source_file': 'demo.epub',
     },
     chapters: const [
       PizzaChapter(
@@ -2496,8 +2504,8 @@ PizzaBook _demoBook() {
         title: 'Impasto',
         text:
             'Ogni libro entra nel forno del browser. Il testo viene pulito, '
-            'ordinato in capitoli e trasformato in un formato Pizza Book '
-            'uguale per ogni sorgente.',
+            'ordinato in capitoli e preparato per una lettura rapida '
+            'coerente su ogni sorgente.',
       ),
       PizzaChapter(
         id: 'chapter-2',

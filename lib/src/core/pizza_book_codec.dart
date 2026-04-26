@@ -8,7 +8,7 @@ import 'pizza_book.dart';
 class PizzaBookCodec {
   const PizzaBookCodec();
 
-  static const String format = 'pizza_book';
+  static const String format = 'pizza_reader_document';
   static const int version = 1;
   static const String hashPrefix = 'sha256:';
 
@@ -31,32 +31,36 @@ class PizzaBookCodec {
     try {
       decoded = jsonDecode(source);
     } on FormatException catch (error) {
-      throw FormatException('Pizza Book must be valid JSON: ${error.message}');
+      throw FormatException(
+        'Reader document must be valid JSON: ${error.message}',
+      );
     }
 
     if (decoded is! Map) {
-      throw const FormatException('Pizza Book root must be a JSON object.');
+      throw const FormatException(
+        'Reader document root must be a JSON object.',
+      );
     }
 
     final document = <String, Object?>{};
     for (final entry in decoded.entries) {
       final key = entry.key;
       if (key is! String) {
-        throw const FormatException('Pizza Book root keys must be strings.');
+        throw const FormatException('Reader document keys must be strings.');
       }
       document[key] = entry.value;
     }
 
     if (document['format'] != format) {
-      throw const FormatException('Unsupported Pizza Book format.');
+      throw const FormatException('Unsupported reader document format.');
     }
     if (document['version'] != version) {
-      throw const FormatException('Unsupported Pizza Book version.');
+      throw const FormatException('Unsupported reader document version.');
     }
 
     final hash = document['content_hash'];
     if (hash is! String || !hash.startsWith(hashPrefix)) {
-      throw const FormatException('Pizza Book content_hash is required.');
+      throw const FormatException('Reader document content_hash is required.');
     }
 
     final book = PizzaBook.fromJson(document['book']);
@@ -65,7 +69,7 @@ class PizzaBookCodec {
     final expectedHash = contentHash(book);
     if (hash != expectedHash) {
       throw FormatException(
-        'Pizza Book content hash mismatch. Expected $expectedHash.',
+        'Reader document content hash mismatch. Expected $expectedHash.',
       );
     }
 

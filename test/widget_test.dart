@@ -1,5 +1,6 @@
 import 'dart:ui' show Size;
 
+import 'package:flutter/material.dart' show Icons, TextField;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart' show Image;
 import 'package:pizza_reader/src/supabase/supabase.dart';
@@ -16,8 +17,12 @@ void main() {
     expect(find.text('Local/Fake'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Code'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.widgetWithText(TextField, 'Code')).enabled,
+      isTrue,
+    );
     expect(find.text('Nessun libro importato'), findsOneWidget);
-    expect(find.text('Demo Pizza Book'), findsWidgets);
+    expect(find.text('Demo Ebook'), findsWidgets);
     expect(find.text('Velocita'), findsOneWidget);
     expect(find.text('Modalita'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -46,7 +51,7 @@ void main() {
     expect(find.text('Roadside Notes'), findsOneWidget);
     expect(find.text('Attivo'), findsWidgets);
     expect(find.text('15 KB'), findsOneWidget);
-    expect(find.text('EPUB/PB'), findsNWidgets(2));
+    expect(find.text('EPUB'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
@@ -56,8 +61,15 @@ void main() {
     await tester.pumpWidget(PizzaReaderApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Demo Pizza Book'), findsWidgets);
+    expect(find.text('Demo Ebook'), findsWidgets);
     expect(find.byTooltip('Account e libreria'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byTooltip('Account e libreria'),
+        matching: find.byIcon(Icons.menu_book_rounded),
+      ),
+      findsOneWidget,
+    );
     expect(find.byTooltip('Importa ebook'), findsOneWidget);
     expect(find.text('360'), findsOneWidget);
     expect(find.text('WPM'), findsOneWidget);
@@ -69,8 +81,17 @@ void main() {
     expect(find.text('Accesso'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Code'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.widgetWithText(TextField, 'Code')).enabled,
+      isTrue,
+    );
     expect(find.text('Libreria'), findsOneWidget);
     expect(find.text('Nessun libro importato'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Code'), '123456');
+    await tester.pump();
+
+    expect(find.text('Verifica'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -105,10 +126,10 @@ Future<FakeLibraryRepository> _seedLibrary() async {
     const LibraryBook(
       id: 'demo-pizza-book',
       userId: 'fake-user',
-      title: 'Demo Pizza Book',
+      title: 'Demo Ebook',
       author: 'Pizza Reader',
       sourceFileName: 'demo.epub',
-      storagePath: 'fake-user/demo-pizza-book.pb',
+      storagePath: 'fake-user/demo-pizza-book.json',
       byteLength: 4096,
     ),
   );
@@ -119,7 +140,7 @@ Future<FakeLibraryRepository> _seedLibrary() async {
       title: 'Roadside Notes',
       author: 'Luca',
       sourceFileName: 'roadside.epub',
-      storagePath: 'fake-user/roadside-notes.pb',
+      storagePath: 'fake-user/roadside-notes.json',
       byteLength: 15360,
     ),
   );

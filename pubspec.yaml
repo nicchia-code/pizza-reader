@@ -1,5 +1,5 @@
 name: pizza_reader
-description: "Client-side fast reading app with Pizza Book conversion and Supabase sync."
+description: "Client-side fast reading app with ebook import and Supabase sync."
 publish_to: 'none'
 version: 1.0.0+1
 

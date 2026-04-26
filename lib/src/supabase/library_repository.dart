@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const pizzaBooksBucketId = 'pizza-books';
 const booksTableName = 'books';
 const readingProgressTableName = 'reading_progress';
-const pizzaBookContentType = 'application/vnd.pizza-book+json';
+const pizzaBookContentType = 'application/json';
 
 abstract interface class LibraryRepository {
   Future<LibraryBook> uploadBook({
@@ -88,8 +88,10 @@ class SupabaseLibraryRepository implements LibraryRepository {
         'storagePath must be scoped under current user.',
       );
     }
-    if (!storagePath.endsWith('.pb')) {
-      throw const LibraryRepositoryException('storagePath must end with .pb.');
+    if (!storagePath.endsWith('.json')) {
+      throw const LibraryRepositoryException(
+        'storagePath must end with .json.',
+      );
     }
 
     return _client.storage.from(storageBucket).download(storagePath);
@@ -268,8 +270,10 @@ class LibraryBook {
         'storagePath must be scoped under userId.',
       );
     }
-    if (!normalizedStoragePath.endsWith('.pb')) {
-      throw const LibraryRepositoryException('storagePath must end with .pb.');
+    if (!normalizedStoragePath.endsWith('.json')) {
+      throw const LibraryRepositoryException(
+        'storagePath must end with .json.',
+      );
     }
 
     return {
@@ -385,7 +389,7 @@ class LibraryRepositoryException implements Exception {
 String pizzaBookDigest(Uint8List bytes) => sha256.convert(bytes).toString();
 
 String pizzaBookStoragePath({required String userId, required String bookId}) {
-  return '${requireText('userId', userId)}/${sanitizeBookId(bookId)}.pb';
+  return '${requireText('userId', userId)}/${sanitizeBookId(bookId)}.json';
 }
 
 String sanitizeBookId(String value) {

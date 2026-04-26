@@ -7,14 +7,11 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:xml/xml.dart' as xml;
 
 import '../core/pizza_book.dart';
-import '../core/pizza_book_codec.dart';
 
-enum PizzaImportKind { text, markdown, html, epub, fb2, pizzaBook, mobi, azw }
+enum PizzaImportKind { text, markdown, html, epub, fb2, mobi, azw }
 
 class PizzaImporter {
-  const PizzaImporter({this.codec = const PizzaBookCodec()});
-
-  final PizzaBookCodec codec;
+  const PizzaImporter();
 
   PizzaBook importBytes(
     List<int> bytes, {
@@ -44,13 +41,11 @@ class PizzaImporter {
         return _importEpub(bytes, fileName: fileName, title: title);
       case PizzaImportKind.fb2:
         return _importFb2(bytes, fileName: fileName, title: title);
-      case PizzaImportKind.pizzaBook:
-        return codec.decodeBytes(bytes);
       case PizzaImportKind.mobi:
       case PizzaImportKind.azw:
         throw UnsupportedError(
           'MOBI/AZW import is not supported yet. Convert the book to EPUB, '
-          'TXT, Markdown, HTML, or .pb before importing.',
+          'FB2, TXT, Markdown, or HTML before importing.',
         );
     }
   }
@@ -272,9 +267,6 @@ class _BookMetadata {
 
 PizzaImportKind _kindFromFileName(String fileName) {
   final lower = fileName.toLowerCase();
-  if (lower.endsWith('.pb')) {
-    return PizzaImportKind.pizzaBook;
-  }
   if (lower.endsWith('.txt')) {
     return PizzaImportKind.text;
   }

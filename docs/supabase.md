@@ -19,7 +19,7 @@ credentials.
 Apply the migration in `supabase/migrations` to create:
 
 - private Storage bucket `pizza-books`;
-- `public.books` for `.pb` object metadata;
+- `public.books` for imported ebook metadata;
 - `public.reading_progress` for the current reader state:
   `chapter_index`, `word_index`, `wpm`, `mode`, and `progress_fraction`;
 - RLS policies that restrict rows and Storage objects to `auth.uid()`.
@@ -27,20 +27,20 @@ Apply the migration in `supabase/migrations` to create:
 Book objects are uploaded under:
 
 ```text
-<auth.uid()>/<book_id>.pb
+<auth.uid()>/<book_id>.json
 ```
 
 That path is part of the Storage RLS policy, so clients must be signed in before
 uploading with the real `SupabaseLibraryRepository`.
 
-The `.pb` object body is Pizza Book v1 JSON encoded as UTF-8 and uploaded with
-content type `application/vnd.pizza-book+json`.
+The stored object body is normalized reader JSON encoded as UTF-8 and uploaded
+with content type `application/json`.
 
 `SupabaseLibraryRepository` supports the full book lifecycle:
 
-- `uploadBook` stores `.pb` bytes in Storage and upserts metadata in
+- `uploadBook` stores normalized reader JSON in Storage and upserts metadata in
   `public.books`;
-- `downloadBookBytes` downloads the stored `.pb` bytes for a listed
+- `downloadBookBytes` downloads the stored reader object for a listed
   `LibraryBook`;
 - `upsertReadingProgress` stores reader progress using chapter and word
   indices, optional `wpm`, optional `mode`, and a normalized fraction;

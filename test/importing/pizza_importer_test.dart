@@ -3,13 +3,11 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pizza_reader/src/core/pizza_book.dart';
-import 'package:pizza_reader/src/core/pizza_book_codec.dart';
 import 'package:pizza_reader/src/importing/pizza_importer.dart';
 
 void main() {
   group('PizzaImporter', () {
-    test('imports txt, markdown, html, and .pb bytes', () {
+    test('imports txt, markdown, and html bytes', () {
       const importer = PizzaImporter();
 
       final txt = importer.importBytes(
@@ -39,21 +37,6 @@ void main() {
       expect(html.title, 'HTML Book');
       expect(html.chapters.single.text, contains('Hello pizza .'));
       expect(html.chapters.single.text, isNot(contains('bad()')));
-
-      const codec = PizzaBookCodec();
-      final original = PizzaBook(
-        id: 'pb-import',
-        title: 'PB Import',
-        chapters: const <PizzaChapter>[
-          PizzaChapter(id: 'chapter-1', title: 'Only', text: 'PB text.'),
-        ],
-      );
-      final pb = importer.importBytes(
-        codec.encode(original),
-        fileName: 'book.pb',
-      );
-      expect(pb.title, original.title);
-      expect(pb.chapters.single.text, original.chapters.single.text);
     });
 
     test('imports a minimal EPUB spine in reading order', () {

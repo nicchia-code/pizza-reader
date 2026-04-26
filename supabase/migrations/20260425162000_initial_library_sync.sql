@@ -13,7 +13,7 @@ values (
   'pizza-books',
   false,
   52428800,
-  array['application/vnd.pizza-book+json', 'application/json', 'application/octet-stream']
+  array['application/json', 'application/octet-stream']
 )
 on conflict (id) do update
 set
@@ -39,7 +39,7 @@ create table if not exists public.books (
   check (char_length(title) > 0),
   check (storage_bucket = 'pizza-books'),
   check (starts_with(storage_path, user_id::text || '/')),
-  check (storage_path like '%.pb')
+  check (storage_path like '%.json')
 );
 
 create table if not exists public.reading_progress (
@@ -144,51 +144,51 @@ using (user_id = auth.uid());
 grant select, insert, update, delete on public.books to authenticated;
 grant select, insert, update, delete on public.reading_progress to authenticated;
 
-drop policy if exists "Users can read own pizza book objects" on storage.objects;
-create policy "Users can read own pizza book objects"
+drop policy if exists "Users can read own reader objects" on storage.objects;
+create policy "Users can read own reader objects"
 on storage.objects
 for select
 to authenticated
 using (
   bucket_id = 'pizza-books'
   and (storage.foldername(name))[1] = auth.uid()::text
-  and name like '%.pb'
+  and name like '%.json'
 );
 
-drop policy if exists "Users can insert own pizza book objects" on storage.objects;
-create policy "Users can insert own pizza book objects"
+drop policy if exists "Users can insert own reader objects" on storage.objects;
+create policy "Users can insert own reader objects"
 on storage.objects
 for insert
 to authenticated
 with check (
   bucket_id = 'pizza-books'
   and (storage.foldername(name))[1] = auth.uid()::text
-  and name like '%.pb'
+  and name like '%.json'
 );
 
-drop policy if exists "Users can update own pizza book objects" on storage.objects;
-create policy "Users can update own pizza book objects"
+drop policy if exists "Users can update own reader objects" on storage.objects;
+create policy "Users can update own reader objects"
 on storage.objects
 for update
 to authenticated
 using (
   bucket_id = 'pizza-books'
   and (storage.foldername(name))[1] = auth.uid()::text
-  and name like '%.pb'
+  and name like '%.json'
 )
 with check (
   bucket_id = 'pizza-books'
   and (storage.foldername(name))[1] = auth.uid()::text
-  and name like '%.pb'
+  and name like '%.json'
 );
 
-drop policy if exists "Users can delete own pizza book objects" on storage.objects;
-create policy "Users can delete own pizza book objects"
+drop policy if exists "Users can delete own reader objects" on storage.objects;
+create policy "Users can delete own reader objects"
 on storage.objects
 for delete
 to authenticated
 using (
   bucket_id = 'pizza-books'
   and (storage.foldername(name))[1] = auth.uid()::text
-  and name like '%.pb'
+  and name like '%.json'
 );

@@ -5,7 +5,7 @@ import 'package:pizza_reader/src/supabase/supabase.dart';
 
 void main() {
   group('FakeLibraryRepository', () {
-    test('uploads pb bytes and upserts metadata in memory', () async {
+    test('uploads reader bytes and upserts metadata in memory', () async {
       final repository = FakeLibraryRepository(userId: 'user-1');
       final bytes = Uint8List.fromList([1, 2, 3, 4]);
 
@@ -13,7 +13,7 @@ void main() {
         bytes: bytes,
         title: ' My Book ',
         author: ' Author ',
-        sourceFileName: '/tmp/source.pb',
+        sourceFileName: '/tmp/source.epub',
         bookId: ' weird id ! ',
       );
 
@@ -21,9 +21,9 @@ void main() {
       expect(book.userId, 'user-1');
       expect(book.title, 'My Book');
       expect(book.author, 'Author');
-      expect(book.sourceFileName, 'source.pb');
+      expect(book.sourceFileName, 'source.epub');
       expect(book.storageBucket, pizzaBooksBucketId);
-      expect(book.storagePath, 'user-1/weird-id.pb');
+      expect(book.storagePath, 'user-1/weird-id.json');
       expect(book.byteLength, bytes.length);
       expect(book.sha256, pizzaBookDigest(bytes));
       expect(
@@ -44,7 +44,7 @@ void main() {
           id: 'book-1',
           userId: 'user-1',
           title: 'Book',
-          storagePath: 'user-1/book-1.pb',
+          storagePath: 'user-1/book-1.json',
           byteLength: 42,
         ),
       );

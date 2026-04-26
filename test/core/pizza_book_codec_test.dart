@@ -6,7 +6,7 @@ import 'package:pizza_reader/src/core/pizza_book_codec.dart';
 
 void main() {
   group('PizzaBookCodec', () {
-    test('encodes and decodes .pb v1 JSON UTF-8 with content hash', () {
+    test('encodes and decodes reader JSON with content hash', () {
       const codec = PizzaBookCodec();
       final book = _sampleBook();
 
@@ -58,7 +58,7 @@ PizzaBook _sampleBook({
 }) {
   return PizzaBook(
     id: 'book-1',
-    title: 'Pizza Book',
+    title: 'Reader Sample',
     author: 'Pizza Reader',
     language: 'en',
     chapters: const <PizzaChapter>[
