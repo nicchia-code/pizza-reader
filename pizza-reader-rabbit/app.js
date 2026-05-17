@@ -59,17 +59,27 @@
   }
 
   async function shouldRunReader() {
-    if (isForcedReaderMode()) return true;
+    if (hasHardForceReaderParam()) return true;
     for (let attempt = 0; attempt < 8; attempt += 1) {
       if (isRabbitRuntime()) return true;
       await delay(100);
     }
-    return false;
+    return hasLaunchAppParam() && isRabbitViewport();
   }
 
-  function isForcedReaderMode() {
+  function hasHardForceReaderParam() {
+    return new URLSearchParams(window.location.search).has("forceReader");
+  }
+
+  function hasLaunchAppParam() {
     const params = new URLSearchParams(window.location.search);
-    return params.has("app") || params.has("rabbit") || params.has("forceReader");
+    return params.has("app") || params.has("rabbit") || params.has("book");
+  }
+
+  function isRabbitViewport() {
+    const width = Math.min(window.innerWidth || 0, window.screen && window.screen.width || 0) || window.innerWidth;
+    const height = Math.min(window.innerHeight || 0, window.screen && window.screen.height || 0) || window.innerHeight;
+    return width <= 360 && height <= 420;
   }
 
   function isRabbitRuntime() {

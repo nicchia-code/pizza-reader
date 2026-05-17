@@ -138,10 +138,10 @@ python3 -m http.server 8080
 
 Apri `http://localhost:8080`.
 
-In un browser normale la root mostra il QR di installazione. Per forzare il reader durante lo sviluppo usa:
+In un browser normale la root mostra il QR di installazione, anche se l'URL contiene `?app=1`. Per forzare davvero il reader durante lo sviluppo usa:
 
 ```text
-http://localhost:8080/?app=1
+http://localhost:8080/?forceReader=1
 ```
 
 Fallback tastiera browser:
