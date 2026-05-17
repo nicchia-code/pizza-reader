@@ -1,6 +1,6 @@
 # Pizza Reader Rabbit
 
-Creation statica per Rabbit r1: importa un libro `.pizzabook.json` via QR/URL e lo legge una parola alla volta.
+Creation statica per Rabbit r1: importa un libro `.pizzabook.json` via QR e lo legge una parola alla volta.
 
 ## Formato libro
 
@@ -70,7 +70,7 @@ Dati contenuti nel QR di installazione della creation:
 ```json
 {
   "title": "Pizza Reader",
-  "url": "https://<utente>.github.io/<repo>/",
+  "url": "https://<utente>.github.io/<repo>/?app=1",
   "description": "Reader one-word-at-a-time per libri .pizzabook.json",
   "themeColor": "#fff4df"
 }
@@ -122,18 +122,12 @@ Touch fallback:
 
 - Importa/scansiona QR
 - conferme
-- URL manuale
 - WPM ±
 - play/prev/next se serve durante test browser
 
 ## Scanner QR
 
-MVP:
-
-- usa `BarcodeDetector` se disponibile
-- se non disponibile, usare il campo URL manuale
-
-`jsQR` non è vendorizzato in questa versione.
+Lo scanner usa `BarcodeDetector` quando disponibile e altrimenti fa fallback su `jsQR` vendorizzato in `jsqr.js`.
 
 ## Sviluppo locale
 

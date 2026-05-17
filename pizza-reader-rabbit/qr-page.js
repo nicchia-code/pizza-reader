@@ -7,7 +7,7 @@
   const bookQr = document.getElementById("bookQr");
   const bookQrWrap = document.getElementById("bookQrWrap");
 
-  const creationUrl = new URL("./", window.location.href).href;
+  const creationUrl = new URL("./?app=1", window.location.href).href;
   const installPayload = {
     title: "Pizza Reader",
     url: creationUrl,

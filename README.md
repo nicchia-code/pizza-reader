@@ -15,7 +15,7 @@ cd pizza-baker
 uv run pizza-baker bake book.epub --plain-json -o book.pizzabook.json
 ```
 
-Poi il JSON va pubblicato su HTTPS con CORS ok e importato da Rabbit tramite QR o URL manuale.
+Poi il JSON va pubblicato su HTTPS con CORS ok e importato da Rabbit tramite QR.
 
 ## Deploy GitHub Pages
 
@@ -43,7 +43,7 @@ https://<utente>.github.io/<repo>/qr.html
 
 Aprila da telefono o computer per mostrare il QR di installazione della creation e generare QR per i libri.
 
-Per usare GitHub Pages anche per i libri, carica i `.pizzabook.json` dentro una sottocartella pubblicata, ad esempio `pizza-reader-rabbit/books/`. L'URL da inserire/scansionare sarà allora:
+Per usare GitHub Pages anche per i libri, carica i `.pizzabook.json` dentro una sottocartella pubblicata, ad esempio `pizza-reader-rabbit/books/`. L'URL da trasformare in QR sarà allora:
 
 ```text
 https://<utente>.github.io/<repo>/books/libro.pizzabook.json

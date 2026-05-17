@@ -51,7 +51,7 @@
     </section>
 
     <section id="emptyView" class="empty">
-      <p>Importa un <code>.pizzabook.json</code> con QR o URL.</p>
+      <p>Importa un <code>.pizzabook.json</code> scansionando un QR.</p>
       <button id="emptyImportButton" class="primary" type="button">Scansiona QR</button>
     </section>
 
@@ -63,15 +63,11 @@
         <button id="scanButton" class="primary" type="button">Avvia camera</button>
         <button id="stopScanButton" type="button" class="hidden">Stop</button>
       </div>
-      <form id="urlForm" class="url-form">
-        <label for="bookUrl">URL manuale</label>
-        <input id="bookUrl" name="bookUrl" type="url" inputmode="url" placeholder="https://.../libro.pizzabook.json">
-        <button type="submit">Scarica</button>
-      </form>
       <button id="cancelImportButton" type="button">Annulla</button>
     </section>
   </main>
 
+  <script src="jsqr.js"></script>
   <script src="qr-scanner.js"></script>
   <script src="app.js"></script>
 </body>

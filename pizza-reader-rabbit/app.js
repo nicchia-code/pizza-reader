@@ -50,8 +50,6 @@
     scanButton: id("scanButton"),
     stopScanButton: id("stopScanButton"),
     cameraPreview: id("cameraPreview"),
-    urlForm: id("urlForm"),
-    bookUrl: id("bookUrl"),
     cancelImportButton: id("cancelImportButton"),
   };
 
@@ -97,10 +95,10 @@
     const app = document.querySelector(".app");
     if (!app) return;
 
-    const creationUrl = new URL("./", window.location.href).href;
+    const installUrl = new URL("./?app=1", window.location.href).href;
     const installPayload = {
       title: "Pizza Reader",
-      url: creationUrl,
+      url: installUrl,
       description: "Reader one-word-at-a-time per libri .pizzabook.json",
       themeColor: "#fff4df",
     };
@@ -117,7 +115,7 @@
           <img src="${escapeAttribute(qrUrl)}" alt="QR per installare Pizza Reader sul Rabbit r1">
         </div>
         <label class="install-label" for="installUrl">URL creation</label>
-        <input id="installUrl" class="install-url" value="${escapeAttribute(creationUrl)}" readonly>
+        <input id="installUrl" class="install-url" value="${escapeAttribute(installUrl)}" readonly>
         <div class="install-actions">
           <a href="qr.html">Pagina QR completa</a>
           <a href="?app=1">Forza apertura app</a>
@@ -164,10 +162,6 @@
     el.nextChapterButton.addEventListener("click", nextChapter);
     el.scanButton.addEventListener("click", startScan);
     el.stopScanButton.addEventListener("click", stopScan);
-    el.urlForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      importFromUrl(el.bookUrl.value.trim());
-    });
   }
 
   function bindRabbitHardware() {
@@ -207,7 +201,7 @@
     el.importView.classList.remove("hidden");
     el.emptyView.classList.add("hidden");
     el.readerView.classList.add("hidden");
-    el.scanInfo.textContent = "Inquadra un QR con URL HTTPS del libro.";
+    el.scanInfo.textContent = "Inquadra un QR con l'URL HTTPS del libro.";
   }
 
   function hideImport() {
@@ -226,7 +220,7 @@
       el.stopScanButton.classList.remove("hidden");
       await scanner.start();
     } catch (error) {
-      setImportStatus(error.message || "Scanner non disponibile. Usa l'URL manuale.");
+      setImportStatus(error.message || "Scanner non disponibile.");
       stopScan();
     }
   }
