@@ -37,7 +37,15 @@
       if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) {
         throw new Error("URL non supportato");
       }
-      setQrImage(bookQr, url.href);
+      const readerUrl = new URL("./?app=1", window.location.href);
+      readerUrl.searchParams.set("book", url.href);
+      const bookPayload = {
+        title: "Pizza Reader",
+        url: readerUrl.href,
+        description: "Apri Pizza Reader e importa questo libro",
+        themeColor: "#fff4df",
+      };
+      setQrImage(bookQr, JSON.stringify(bookPayload));
       bookQrWrap.classList.remove("empty");
       const nextUrl = new URL(window.location.href);
       nextUrl.searchParams.set("book", url.href);

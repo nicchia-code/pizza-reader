@@ -63,7 +63,7 @@ Inoltre, la root della GitHub Pages (`https://<utente>.github.io/<repo>/`) rilev
 Apri `qr.html` da telefono o computer per mostrare:
 
 - il QR di installazione/apertura della creation;
-- un QR per importare un libro, dato l'URL del file `.pizzabook.json`.
+- un QR libro che apre Pizza Reader sul Rabbit e importa automaticamente l'URL `.pizzabook.json`.
 
 Dati contenuti nel QR di installazione della creation:
 
@@ -92,7 +92,7 @@ Se usi la stessa GitHub Pages, il libro sarà raggiungibile ad esempio qui:
 https://<utente>.github.io/<repo>/books/book.pizzabook.json
 ```
 
-Poi crea un QR contenente l'URL HTTPS del JSON.
+Poi apri `qr.html`, incolla questo URL e genera il QR libro. Il QR libro non avvia la camera dentro la creation: apre Pizza Reader con `?book=<url>` e importa automaticamente il JSON.
 
 Sono accettati solo:
 
@@ -101,8 +101,7 @@ Sono accettati solo:
 
 ## Limiti dimensione
 
-- fino a 2 MB: import normale
-- da 2 a 5 MB: warning e conferma
+- fino a 5 MB: import consentito
 - oltre 5 MB: import bloccato
 
 ## Controlli Rabbit r1
@@ -120,14 +119,13 @@ Hardware-first, touch minimo:
 
 Touch fallback:
 
-- Importa/scansiona QR
-- conferme
+- istruzioni import libro
 - WPM ±
 - play/prev/next se serve durante test browser
 
-## Scanner QR
+## Import via QR
 
-Lo scanner usa `BarcodeDetector` quando disponibile e altrimenti fa fallback su `jsQR` vendorizzato in `jsqr.js`.
+La creation non avvia più direttamente la camera: su Rabbit questa strada può essere instabile. Il QR libro generato da `qr.html` apre invece la creation con un parametro `book`, e la app scarica/importa automaticamente quel file.
 
 ## Sviluppo locale
 

@@ -1,4 +1,4 @@
-/* global PizzaQrScanner, closeWebView */
+/* global closeWebView */
 (() => {
   const STORAGE_KEY = "pizza-reader-rabbit-state-v1";
   const SOFT_LIMIT = 2 * 1024 * 1024;
@@ -47,13 +47,8 @@
     nextWord: id("nextWord"),
     playPause: id("playPause"),
     scanInfo: id("scanInfo"),
-    scanButton: id("scanButton"),
-    stopScanButton: id("stopScanButton"),
-    cameraPreview: id("cameraPreview"),
     cancelImportButton: id("cancelImportButton"),
   };
-
-  let scanner = null;
 
   boot();
 
@@ -90,7 +85,6 @@
   }
 
   function renderInstallLanding() {
-    stopScan();
     stopPlayback();
     const app = document.querySelector(".app");
     if (!app) return;
@@ -145,6 +139,12 @@
     }
     await loadState();
     hydrateWords();
+    const launchBookUrl = getLaunchBookUrl();
+    if (launchBookUrl) {
+      showImport();
+      await importFromUrl(launchBookUrl, { confirmReplace: false, clearLaunchParam: true });
+      return;
+    }
     render();
   }
 
@@ -160,8 +160,6 @@
     el.wpmDown.addEventListener("click", () => changeWpm(-WPM_STEP));
     el.wpmUp.addEventListener("click", () => changeWpm(WPM_STEP));
     el.nextChapterButton.addEventListener("click", nextChapter);
-    el.scanButton.addEventListener("click", startScan);
-    el.stopScanButton.addEventListener("click", stopScan);
   }
 
   function bindRabbitHardware() {
@@ -201,53 +199,32 @@
     el.importView.classList.remove("hidden");
     el.emptyView.classList.add("hidden");
     el.readerView.classList.add("hidden");
-    el.scanInfo.textContent = "Inquadra un QR con l'URL HTTPS del libro.";
+    el.scanInfo.textContent = "Per importare un libro, apri la pagina QR su telefono/computer e scansiona il QR libro con il Rabbit.";
   }
 
   function hideImport() {
-    stopScan();
     el.importView.classList.add("hidden");
     render();
   }
 
-  async function startScan() {
-    try {
-      stopScan();
-      scanner = new PizzaQrScanner(el.cameraPreview, (code) => {
-        stopScan();
-        importFromUrl(code.trim());
-      }, setImportStatus);
-      el.stopScanButton.classList.remove("hidden");
-      await scanner.start();
-    } catch (error) {
-      setImportStatus(error.message || "Scanner non disponibile.");
-      stopScan();
-    }
-  }
-
-  function stopScan() {
-    if (scanner) scanner.stop();
-    scanner = null;
-    el.stopScanButton.classList.add("hidden");
-  }
-
-  async function importFromUrl(rawUrl) {
+  async function importFromUrl(rawUrl, options = {}) {
     try {
       const url = validateUrl(rawUrl);
-      if (state.book && !window.confirm("Sostituire il libro corrente?")) return;
+      const shouldConfirm = options.confirmReplace !== false;
+      if (state.book && shouldConfirm && !window.confirm("Sostituire il libro corrente?")) return;
       setImportStatus("Controllo dimensione…");
       const response = await fetch(url, { method: "GET", mode: "cors" });
       if (!response.ok) throw new Error(`URL non raggiungibile (${response.status}).`);
 
       const length = Number(response.headers.get("content-length") || 0);
       if (length > HARD_LIMIT) throw new Error("Libro troppo grande: massimo 5 MB.");
-      if (length > SOFT_LIMIT && !window.confirm("Libro grande: potrebbe essere lento. Continuare?")) return;
+      if (length > SOFT_LIMIT && shouldConfirm && !window.confirm("Libro grande: potrebbe essere lento. Continuare?")) return;
 
       setImportStatus("Scarico libro…");
       const text = await response.text();
       const size = new Blob([text]).size;
       if (size > HARD_LIMIT) throw new Error("Libro troppo grande: massimo 5 MB.");
-      if (size > SOFT_LIMIT && length === 0 && !window.confirm("Libro grande: potrebbe essere lento. Continuare?")) return;
+      if (size > SOFT_LIMIT && length === 0 && shouldConfirm && !window.confirm("Libro grande: potrebbe essere lento. Continuare?")) return;
 
       let doc;
       try { doc = JSON.parse(text); } catch (_) { throw new Error("JSON non valido."); }
@@ -264,6 +241,7 @@
       hydrateWords();
       await saveStateNow();
       setImportStatus(`Importato: ${state.book.title}`);
+      if (options.clearLaunchParam) clearLaunchBookUrl();
       hideImport();
     } catch (error) {
       setImportStatus(error.message || "Import fallito.");
@@ -276,6 +254,17 @@
     const isLocalhost = parsed.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
     if (parsed.protocol !== "https:" && !isLocalhost) throw new Error("URL non sicuro: usa HTTPS.");
     return parsed.toString();
+  }
+
+  function getLaunchBookUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("book") || "";
+  }
+
+  function clearLaunchBookUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("book");
+    window.history.replaceState(null, "", url.href);
   }
 
   function normalizeDocument(doc) {

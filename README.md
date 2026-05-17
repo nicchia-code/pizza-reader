@@ -41,7 +41,7 @@ La pagina pubblicata include anche un generatore QR completo:
 https://<utente>.github.io/<repo>/qr.html
 ```
 
-Aprila da telefono o computer per mostrare il QR di installazione della creation e generare QR per i libri.
+Aprila da telefono o computer per mostrare il QR di installazione della creation e generare QR libro che aprono Pizza Reader sul Rabbit importando automaticamente il file selezionato.
 
 Per usare GitHub Pages anche per i libri, carica i `.pizzabook.json` dentro una sottocartella pubblicata, ad esempio `pizza-reader-rabbit/books/`. L'URL da trasformare in QR sarà allora:
 

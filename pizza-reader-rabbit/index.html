@@ -51,24 +51,18 @@
     </section>
 
     <section id="emptyView" class="empty">
-      <p>Importa un <code>.pizzabook.json</code> scansionando un QR.</p>
-      <button id="emptyImportButton" class="primary" type="button">Scansiona QR</button>
+      <p>Importa un <code>.pizzabook.json</code> dalla pagina QR.</p>
+      <button id="emptyImportButton" class="primary" type="button">Come importare</button>
     </section>
 
     <section id="importView" class="importer hidden">
       <h2>Importa libro</h2>
-      <p id="scanInfo">Inquadra un QR con URL HTTPS del libro.</p>
-      <video id="cameraPreview" class="camera hidden" muted playsinline></video>
-      <div class="import-actions">
-        <button id="scanButton" class="primary" type="button">Avvia camera</button>
-        <button id="stopScanButton" type="button" class="hidden">Stop</button>
-      </div>
-      <button id="cancelImportButton" type="button">Annulla</button>
+      <p id="scanInfo">Per importare un libro, apri la pagina QR su telefono/computer e scansiona il QR libro con il Rabbit.</p>
+      <p class="import-hint">La creation importerà automaticamente il libro dall'URL contenuto nel QR.</p>
+      <button id="cancelImportButton" type="button">Ok</button>
     </section>
   </main>
 
-  <script src="jsqr.js"></script>
-  <script src="qr-scanner.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
