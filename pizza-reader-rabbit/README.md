@@ -38,12 +38,46 @@ Nota: l'output `.pizzabook` gzip è per PizzaReader Flutter. Per Rabbit usare `-
 
 ## Hosting e QR
 
+### Deploy della creation con GitHub Pages
+
+La root del sito GitHub Pages deve essere il contenuto di questa cartella (`pizza-reader-rabbit/`). Il repository contiene già il workflow:
+
+```text
+.github/workflows/deploy-rabbit-pages.yml
+```
+
+Per usarlo:
+
+1. abilita **Settings → Pages → Source → GitHub Actions** nel repository GitHub;
+2. fai push/merge su `main` o `master`, oppure lancia manualmente il workflow **Deploy Rabbit creation to GitHub Pages** da **Actions**;
+3. usa l'URL pubblicato, di solito `https://<utente>.github.io/<repo>/`, come URL della creation Rabbit.
+
+Dati suggeriti per il QR di installazione della creation:
+
+```json
+{
+  "title": "Pizza Reader",
+  "url": "https://<utente>.github.io/<repo>/",
+  "description": "Reader one-word-at-a-time per libri .pizzabook.json",
+  "themeColor": "#fff4df"
+}
+```
+
+### Hosting dei libri
+
 Carica `book.pizzabook.json` su hosting HTTPS pubblico con CORS compatibile con `fetch`, ad esempio:
 
-- GitHub Pages
+- la stessa GitHub Pages della creation, dentro `pizza-reader-rabbit/books/`
+- GitHub Pages su un altro repo
 - Netlify
 - Supabase public bucket
 - CDN/static hosting
+
+Se usi la stessa GitHub Pages, il libro sarà raggiungibile ad esempio qui:
+
+```text
+https://<utente>.github.io/<repo>/books/book.pizzabook.json
+```
 
 Poi crea un QR contenente l'URL HTTPS del JSON.
 

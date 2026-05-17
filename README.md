@@ -17,4 +17,26 @@ uv run pizza-baker bake book.epub --plain-json -o book.pizzabook.json
 
 Poi il JSON va pubblicato su HTTPS con CORS ok e importato da Rabbit tramite QR o URL manuale.
 
+## Deploy GitHub Pages
+
+Questo repo include una GitHub Action che pubblica automaticamente la creation statica `pizza-reader-rabbit/` su GitHub Pages quando fai push su `main` o `master`.
+
+Nel repository GitHub:
+
+1. vai in **Settings → Pages**;
+2. in **Build and deployment → Source** scegli **GitHub Actions**;
+3. vai in **Actions** e lancia, o attendi, il workflow **Deploy Rabbit creation to GitHub Pages**.
+
+L'URL della creation sarà mostrato nel riepilogo del deploy, tipicamente:
+
+```text
+https://<utente>.github.io/<repo>/
+```
+
+Per usare GitHub Pages anche per i libri, carica i `.pizzabook.json` dentro una sottocartella pubblicata, ad esempio `pizza-reader-rabbit/books/`. L'URL da inserire/scansionare sarà allora:
+
+```text
+https://<utente>.github.io/<repo>/books/libro.pizzabook.json
+```
+
 Vedi `pizza-reader-rabbit/README.md`.
