@@ -27,21 +27,19 @@ Nel repository GitHub:
 2. in **Build and deployment → Source** scegli **GitHub Actions**;
 3. vai in **Actions** e lancia, o attendi, il workflow **Deploy Rabbit creation to GitHub Pages**.
 
-L'URL della creation sarà mostrato nel riepilogo del deploy, tipicamente:
+L'URL della GitHub Pages sarà mostrato nel riepilogo del deploy, tipicamente:
 
 ```text
 https://<utente>.github.io/<repo>/
 ```
 
-La root pubblicata rileva se non sta girando sul Rabbit: in quel caso mostra direttamente il QR di installazione/apertura della creation invece del reader.
-
-La pagina pubblicata include anche un generatore QR completo:
+Da desktop/telefono la root reindirizza direttamente al generatore QR:
 
 ```text
 https://<utente>.github.io/<repo>/qr.html
 ```
 
-Aprila da telefono o computer per mostrare il QR di installazione della creation e generare QR libro che aprono Pizza Reader sul Rabbit importando automaticamente il file selezionato.
+Da lì generi sia il QR di installazione della creation sia i QR libro che aprono Pizza Reader sul Rabbit importando automaticamente il file selezionato.
 
 Per usare GitHub Pages anche per i libri, carica i `.pizzabook.json` dentro una sottocartella pubblicata, ad esempio `pizza-reader-rabbit/books/`. L'URL da trasformare in QR sarà allora:
 

@@ -50,15 +50,13 @@ Per usarlo:
 
 1. abilita **Settings → Pages → Source → GitHub Actions** nel repository GitHub;
 2. fai push/merge su `main` o `master`, oppure lancia manualmente il workflow **Deploy Rabbit creation to GitHub Pages** da **Actions**;
-3. usa l'URL pubblicato, di solito `https://<utente>.github.io/<repo>/`, come URL della creation Rabbit.
+3. apri l'URL pubblicato, di solito `https://<utente>.github.io/<repo>/`, da desktop/telefono: verrai portato direttamente al generatore QR.
 
-La pagina pubblicata include anche un generatore QR:
+Il generatore QR è qui:
 
 ```text
 https://<utente>.github.io/<repo>/qr.html
 ```
-
-Inoltre, la root della GitHub Pages (`https://<utente>.github.io/<repo>/`) rileva se non sta girando sul Rabbit: in quel caso mostra direttamente il QR di installazione/apertura della creation invece del reader.
 
 Apri `qr.html` da telefono o computer per mostrare:
 
@@ -119,7 +117,6 @@ Hardware-first, touch minimo:
 
 Touch fallback:
 
-- istruzioni import libro
 - WPM ±
 - play/prev/next se serve durante test browser
 
@@ -136,9 +133,7 @@ cd pizza-reader-rabbit
 python3 -m http.server 8080
 ```
 
-Apri `http://localhost:8080`.
-
-In un browser normale la root mostra il QR di installazione, anche se l'URL contiene `?app=1`. Per forzare davvero il reader durante lo sviluppo usa:
+Apri `http://localhost:8080`: in un browser normale la root reindirizza a `qr.html`, anche se l'URL contiene `?app=1`. Per forzare davvero il reader durante lo sviluppo usa:
 
 ```text
 http://localhost:8080/?forceReader=1

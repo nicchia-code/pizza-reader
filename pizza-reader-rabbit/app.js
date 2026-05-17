@@ -52,7 +52,7 @@
 
   async function boot() {
     if (!await shouldRunReader()) {
-      renderInstallLanding();
+      redirectToQrGenerator();
       return;
     }
     init();
@@ -92,48 +92,16 @@
       || typeof window.creationSensors !== "undefined";
   }
 
-  function renderInstallLanding() {
-    stopPlayback();
-    const app = document.querySelector(".app");
-    if (!app) return;
-
-    const installUrl = new URL("./?app=1", window.location.href).href;
-    const installPayload = {
-      title: "Pizza Reader",
-      url: installUrl,
-      description: "Reader one-word-at-a-time per libri .pizzabook.json",
-      themeColor: "#fff4df",
-    };
-    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data="
-      + encodeURIComponent(JSON.stringify(installPayload));
-
-    app.className = "browser-install";
-    app.innerHTML = `
-      <section class="install-card">
-        <p class="install-eyebrow">Pizza Reader</p>
-        <h1>Scansiona col Rabbit</h1>
-        <div class="install-qr-wrap">
-          <img src="${escapeAttribute(qrUrl)}" alt="QR Pizza Reader Rabbit">
-        </div>
-        <input id="installUrl" class="install-url" value="${escapeAttribute(installUrl)}" readonly>
-        <div class="install-actions">
-          <a href="qr.html">QR libri</a>
-          <a href="?app=1">Apri qui</a>
-        </div>
-      </section>
-    `;
+  function redirectToQrGenerator() {
+    const target = new URL("qr.html", window.location.href);
+    const params = new URLSearchParams(window.location.search);
+    const book = params.get("book");
+    if (book) target.searchParams.set("book", book);
+    window.location.replace(target.href);
   }
 
   function delay(ms) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  function escapeAttribute(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
   }
 
   async function init() {
