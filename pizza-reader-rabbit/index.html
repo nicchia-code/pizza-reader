@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff4df">
+  <title>Pizza Reader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app" aria-live="polite">
+    <header class="topbar">
+      <div>
+        <h1>Pizza Reader</h1>
+        <p id="subtitle" class="subtitle">Nessun libro</p>
+      </div>
+      <div class="top-actions">
+        <button id="importButton" class="small-button" type="button">Importa</button>
+        <button id="closeButton" class="small-button hidden" type="button">Chiudi</button>
+      </div>
+    </header>
+
+    <section id="readerView" class="reader hidden">
+      <div id="chapterLabel" class="chapter-label">—</div>
+      <div id="wordStage" class="word-stage" role="button" tabindex="0" aria-label="Parola corrente">
+        <span id="wordBefore"></span><span id="pivot" class="pivot"></span><span id="wordAfter"></span>
+      </div>
+      <div class="progress-wrap" aria-label="Progresso capitolo">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div class="status-row">
+        <span id="statusText">Pausa</span>
+        <span id="wpmText">220 wpm</span>
+      </div>
+      <div id="chapterEnd" class="chapter-end hidden">
+        <strong>Fine capitolo</strong>
+        <button id="nextChapterButton" type="button">Capitolo successivo</button>
+      </div>
+      <div class="hardware-help">
+        <span>Tasto: play/pausa</span>
+        <span>Rotella: parola ±</span>
+        <span>Hold: lettura</span>
+      </div>
+      <div class="touch-fallback">
+        <button id="wpmDown" type="button">−</button>
+        <button id="prevWord" type="button">←</button>
+        <button id="playPause" type="button">▶</button>
+        <button id="nextWord" type="button">→</button>
+        <button id="wpmUp" type="button">+</button>
+      </div>
+    </section>
+
+    <section id="emptyView" class="empty">
+      <p>Importa un <code>.pizzabook.json</code> con QR o URL.</p>
+      <button id="emptyImportButton" class="primary" type="button">Scansiona QR</button>
+    </section>
+
+    <section id="importView" class="importer hidden">
+      <h2>Importa libro</h2>
+      <p id="scanInfo">Inquadra un QR con URL HTTPS del libro.</p>
+      <video id="cameraPreview" class="camera hidden" muted playsinline></video>
+      <div class="import-actions">
+        <button id="scanButton" class="primary" type="button">Avvia camera</button>
+        <button id="stopScanButton" type="button" class="hidden">Stop</button>
+      </div>
+      <form id="urlForm" class="url-form">
+        <label for="bookUrl">URL manuale</label>
+        <input id="bookUrl" name="bookUrl" type="url" inputmode="url" placeholder="https://.../libro.pizzabook.json">
+        <button type="submit">Scarica</button>
+      </form>
+      <button id="cancelImportButton" type="button">Annulla</button>
+    </section>
+  </main>
+
+  <script src="qr-scanner.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
