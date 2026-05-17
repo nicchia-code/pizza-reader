@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff4df">
+  <title>Pizza Reader · QR</title>
+  <link rel="stylesheet" href="qr-page.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">Pizza Reader Rabbit</p>
+      <h1>QR code</h1>
+      <p>Apri questa pagina da telefono o computer e scansiona i QR con il Rabbit r1.</p>
+      <p class="note">Il Rabbit non può scansionare un QR mostrato sul suo stesso schermo.</p>
+    </header>
+
+    <section class="card">
+      <div class="card-copy">
+        <h2>1. Installa/apri la creation</h2>
+        <p>Questo QR contiene i dati della creation e punta alla GitHub Pages corrente.</p>
+        <label for="creationUrl">URL creation</label>
+        <input id="creationUrl" type="url" readonly>
+      </div>
+      <div class="qr-wrap">
+        <img id="creationQr" alt="QR per installare Pizza Reader sul Rabbit r1">
+      </div>
+      <details>
+        <summary>Payload QR</summary>
+        <pre id="creationPayload"></pre>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="card-copy">
+        <h2>2. Importa un libro</h2>
+        <p>Incolla l'URL HTTPS del file <code>.pizzabook.json</code>. Il QR generato contiene solo quell'URL.</p>
+        <form id="bookForm" class="book-form">
+          <label for="bookUrl">URL libro</label>
+          <input id="bookUrl" type="url" placeholder="https://.../books/libro.pizzabook.json" required>
+          <button type="submit">Genera QR libro</button>
+        </form>
+        <p class="hint">Se il libro è in <code>pizza-reader-rabbit/books/</code>, sarà pubblicato come <code>/books/nome-file.pizzabook.json</code>.</p>
+      </div>
+      <div class="qr-wrap empty" id="bookQrWrap">
+        <img id="bookQr" alt="QR del libro Pizza Reader">
+        <span id="bookQrPlaceholder">Inserisci un URL libro</span>
+      </div>
+    </section>
+
+    <footer>
+      <a href="./">Apri Pizza Reader</a>
+    </footer>
+  </main>
+
+  <script src="qr-page.js"></script>
+</body>
+</html>

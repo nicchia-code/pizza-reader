@@ -52,7 +52,18 @@ Per usarlo:
 2. fai push/merge su `main` o `master`, oppure lancia manualmente il workflow **Deploy Rabbit creation to GitHub Pages** da **Actions**;
 3. usa l'URL pubblicato, di solito `https://<utente>.github.io/<repo>/`, come URL della creation Rabbit.
 
-Dati suggeriti per il QR di installazione della creation:
+La pagina pubblicata include anche un generatore QR:
+
+```text
+https://<utente>.github.io/<repo>/qr.html
+```
+
+Aprila da telefono o computer per mostrare:
+
+- il QR di installazione/apertura della creation;
+- un QR per importare un libro, dato l'URL del file `.pizzabook.json`.
+
+Dati contenuti nel QR di installazione della creation:
 
 ```json
 {

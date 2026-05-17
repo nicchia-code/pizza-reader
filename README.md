@@ -33,6 +33,14 @@ L'URL della creation sarà mostrato nel riepilogo del deploy, tipicamente:
 https://<utente>.github.io/<repo>/
 ```
 
+La pagina pubblicata include anche un generatore QR:
+
+```text
+https://<utente>.github.io/<repo>/qr.html
+```
+
+Aprila da telefono o computer per mostrare il QR di installazione della creation e generare QR per i libri.
+
 Per usare GitHub Pages anche per i libri, carica i `.pizzabook.json` dentro una sottocartella pubblicata, ad esempio `pizza-reader-rabbit/books/`. L'URL da inserire/scansionare sarà allora:
 
 ```text
