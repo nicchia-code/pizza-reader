@@ -33,7 +33,9 @@ L'URL della creation sarà mostrato nel riepilogo del deploy, tipicamente:
 https://<utente>.github.io/<repo>/
 ```
 
-La pagina pubblicata include anche un generatore QR:
+La root pubblicata rileva se non sta girando sul Rabbit: in quel caso mostra direttamente il QR di installazione/apertura della creation invece del reader.
+
+La pagina pubblicata include anche un generatore QR completo:
 
 ```text
 https://<utente>.github.io/<repo>/qr.html

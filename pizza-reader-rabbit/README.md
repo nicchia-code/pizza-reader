@@ -58,7 +58,9 @@ La pagina pubblicata include anche un generatore QR:
 https://<utente>.github.io/<repo>/qr.html
 ```
 
-Aprila da telefono o computer per mostrare:
+Inoltre, la root della GitHub Pages (`https://<utente>.github.io/<repo>/`) rileva se non sta girando sul Rabbit: in quel caso mostra direttamente il QR di installazione/apertura della creation invece del reader.
+
+Apri `qr.html` da telefono o computer per mostrare:
 
 - il QR di installazione/apertura della creation;
 - un QR per importare un libro, dato l'URL del file `.pizzabook.json`.
@@ -143,6 +145,12 @@ python3 -m http.server 8080
 ```
 
 Apri `http://localhost:8080`.
+
+In un browser normale la root mostra il QR di installazione. Per forzare il reader durante lo sviluppo usa:
+
+```text
+http://localhost:8080/?app=1
+```
 
 Fallback tastiera browser:
 

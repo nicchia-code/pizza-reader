@@ -57,7 +57,86 @@
 
   let scanner = null;
 
-  init();
+  boot();
+
+  async function boot() {
+    if (!await shouldRunReader()) {
+      renderInstallLanding();
+      return;
+    }
+    init();
+  }
+
+  async function shouldRunReader() {
+    if (isForcedReaderMode()) return true;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      if (isRabbitRuntime()) return true;
+      await delay(100);
+    }
+    return false;
+  }
+
+  function isForcedReaderMode() {
+    const params = new URLSearchParams(window.location.search);
+    return params.has("app") || params.has("rabbit") || params.has("forceReader");
+  }
+
+  function isRabbitRuntime() {
+    const ua = (navigator.userAgent || "").toLowerCase();
+    return ua.includes("rabbit")
+      || ua.includes("rabbitos")
+      || typeof window.PluginMessageHandler !== "undefined"
+      || typeof window.closeWebView !== "undefined"
+      || typeof window.creationStorage !== "undefined"
+      || typeof window.creationSensors !== "undefined";
+  }
+
+  function renderInstallLanding() {
+    stopScan();
+    stopPlayback();
+    const app = document.querySelector(".app");
+    if (!app) return;
+
+    const creationUrl = new URL("./", window.location.href).href;
+    const installPayload = {
+      title: "Pizza Reader",
+      url: creationUrl,
+      description: "Reader one-word-at-a-time per libri .pizzabook.json",
+      themeColor: "#fff4df",
+    };
+    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data="
+      + encodeURIComponent(JSON.stringify(installPayload));
+
+    app.className = "browser-install";
+    app.innerHTML = `
+      <section class="install-card">
+        <p class="install-eyebrow">Pizza Reader Rabbit</p>
+        <h1>Aprilo sul Rabbit r1</h1>
+        <p>Questa pagina non sembra essere in esecuzione su un Rabbit. Scansiona questo QR con il Rabbit per installare/aprire la creation.</p>
+        <div class="install-qr-wrap">
+          <img src="${escapeAttribute(qrUrl)}" alt="QR per installare Pizza Reader sul Rabbit r1">
+        </div>
+        <label class="install-label" for="installUrl">URL creation</label>
+        <input id="installUrl" class="install-url" value="${escapeAttribute(creationUrl)}" readonly>
+        <div class="install-actions">
+          <a href="qr.html">Pagina QR completa</a>
+          <a href="?app=1">Forza apertura app</a>
+        </div>
+      </section>
+    `;
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function escapeAttribute(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
 
   async function init() {
     bindUi();
