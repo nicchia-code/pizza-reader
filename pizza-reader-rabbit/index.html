@@ -10,14 +10,8 @@
 <body>
   <main class="app" aria-live="polite">
     <header class="topbar">
-      <div>
-        <h1>Pizza Reader</h1>
-        <p id="subtitle" class="subtitle">Nessun libro</p>
-      </div>
-      <div class="top-actions">
-        <button id="importButton" class="small-button" type="button">Importa</button>
-        <button id="closeButton" class="small-button hidden" type="button">Chiudi</button>
-      </div>
+      <p id="subtitle" class="subtitle">—</p>
+      <button id="closeButton" class="small-button hidden" type="button">×</button>
     </header>
 
     <section id="readerView" class="reader hidden">
@@ -36,11 +30,6 @@
         <strong>Fine capitolo</strong>
         <button id="nextChapterButton" type="button">Capitolo successivo</button>
       </div>
-      <div class="hardware-help">
-        <span>Tasto: play/pausa</span>
-        <span>Rotella: parola ±</span>
-        <span>Hold: lettura</span>
-      </div>
       <div class="touch-fallback">
         <button id="wpmDown" type="button">−</button>
         <button id="prevWord" type="button">←</button>
@@ -51,14 +40,11 @@
     </section>
 
     <section id="emptyView" class="empty">
-      <p>Importa un <code>.pizzabook.json</code> dalla pagina QR.</p>
-      <button id="emptyImportButton" class="primary" type="button">Come importare</button>
+      <p>Nessun libro</p>
     </section>
 
     <section id="importView" class="importer hidden">
-      <h2>Importa libro</h2>
-      <p id="scanInfo">Per importare un libro, apri la pagina QR su telefono/computer e scansiona il QR libro con il Rabbit.</p>
-      <p class="import-hint">La creation importerà automaticamente il libro dall'URL contenuto nel QR.</p>
+      <p id="scanInfo">Import…</p>
       <button id="cancelImportButton" type="button">Ok</button>
     </section>
   </main>

@@ -25,8 +25,6 @@
 
   const el = {
     subtitle: id("subtitle"),
-    importButton: id("importButton"),
-    emptyImportButton: id("emptyImportButton"),
     closeButton: id("closeButton"),
     readerView: id("readerView"),
     emptyView: id("emptyView"),
@@ -102,17 +100,15 @@
     app.className = "browser-install";
     app.innerHTML = `
       <section class="install-card">
-        <p class="install-eyebrow">Pizza Reader Rabbit</p>
-        <h1>Aprilo sul Rabbit r1</h1>
-        <p>Questa pagina non sembra essere in esecuzione su un Rabbit. Scansiona questo QR con il Rabbit per installare/aprire la creation.</p>
+        <p class="install-eyebrow">Pizza Reader</p>
+        <h1>Scansiona col Rabbit</h1>
         <div class="install-qr-wrap">
-          <img src="${escapeAttribute(qrUrl)}" alt="QR per installare Pizza Reader sul Rabbit r1">
+          <img src="${escapeAttribute(qrUrl)}" alt="QR Pizza Reader Rabbit">
         </div>
-        <label class="install-label" for="installUrl">URL creation</label>
         <input id="installUrl" class="install-url" value="${escapeAttribute(installUrl)}" readonly>
         <div class="install-actions">
-          <a href="qr.html">Pagina QR completa</a>
-          <a href="?app=1">Forza apertura app</a>
+          <a href="qr.html">QR libri</a>
+          <a href="?app=1">Apri qui</a>
         </div>
       </section>
     `;
@@ -149,8 +145,6 @@
   }
 
   function bindUi() {
-    el.importButton.addEventListener("click", showImport);
-    el.emptyImportButton.addEventListener("click", showImport);
     el.cancelImportButton.addEventListener("click", hideImport);
     el.closeButton.addEventListener("click", () => closeWebView.postMessage(""));
     el.wordStage.addEventListener("click", onSideClick);
@@ -199,7 +193,7 @@
     el.importView.classList.remove("hidden");
     el.emptyView.classList.add("hidden");
     el.readerView.classList.add("hidden");
-    el.scanInfo.textContent = "Per importare un libro, apri la pagina QR su telefono/computer e scansiona il QR libro con il Rabbit.";
+    el.scanInfo.textContent = "Import…";
   }
 
   function hideImport() {
@@ -414,7 +408,7 @@
     el.readerView.classList.toggle("hidden", !hasBook);
     el.emptyView.classList.toggle("hidden", hasBook);
     if (!hasBook) {
-      el.subtitle.textContent = "Nessun libro";
+      el.subtitle.textContent = "—";
       return;
     }
     const chapter = currentChapter();
